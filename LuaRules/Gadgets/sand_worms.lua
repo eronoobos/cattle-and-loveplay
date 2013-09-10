@@ -57,7 +57,8 @@ local sizeX = Game.mapSizeX
 local sizeZ = Game.mapSizeZ
 local angerTimeGain = evalFrequency / 35 -- there are 30 game frames per second, so dividing this by something more makes the worm eventually die even if it has a constant supply of targets
 local evalNewVector = math.floor(16 / wormSpeed)
-local rippled = {} -- stores locations of sand that has been raised by worm to lower it
+local rippled = {} -- stores references to rippleMap that are actively under transformation
+local rippleMap = {}-- stores locations of sand that has been raised by worm to lower it
 local bulgeProfile = {}
 local bulgeStamp = {}
 --local bulgeScaleHalf = bulgeScale / 2
@@ -351,23 +352,24 @@ local function wormLittleSign(wID, sx, sy, sz)
 	Spring.PlaySoundFile(snd,0.75,sx,sy,sz)
 end
 
-local function addRipple(sx, sz, hmod)
+local function initializeRippleMap {
+	for rx = 0, sizeX/8 do
+		rippleMap[rx] = {}
+		for rz = 0, sizeZ/8 do
+			rippleMap[rx][rz] = 0
+		end
+	end
+}
+
+local function addRipple(x, z, hmod)
 	if hmod > 0.1 then
-		Spring.AdjustHeightMap(sx, sz, sx+8, sz+8, hmod)
-		local vals = { 1 }
---		local id = 0
-		--[[
-		repeat
-			id = id + 1
-			vals = rippled[id]
-			if vals then
-				if vals[1] == sx and vals[2] == sz then break end
-			end
-		until not vals
-		]]--
-		if vals then hmod = hmod + vals[3] end
-		table.insert(rippled, {sx, sz, hmod})
---		rippled[id] = { sx, sz, hmod }
+		local rx = math.floor(x / 8)
+		local rz = math.floor(z / 8)
+		x = rx * 8
+		z = z * 8
+		if rippleMap[rx][rz] == 0 then table.insert(rippled, {rx, rz}) end
+		rippleMap[rx][rz] = rippleMap[rx][rz] + hmod
+		Spring.AdjustHeightMap(x, z, x+8, z+8, hmod)
 	end
 end
 
@@ -408,13 +410,15 @@ local function signUnRippleExpand()
 --	local numripples = #rippled
 --	if numripples > 0 then Spring.Echo(#rippled) end
 	for id, vals in pairs(rippled) do
-		local x = vals[1]
-		local z = vals[2]
-		local hmod = vals[3]
+		local rx = vals[1]
+		local rz = vals[2]
+		local x = rx * 8
+		local z = rz * 8
+		local hmod = rippleMap[rx][rz]
 		if hmod > 0.2 then
 			local hsub = hmod / 2
 			Spring.AdjustHeightMap(x, z, x+8, z+8, -hsub)
-			rippled[id][3] = hsub
+			rippleMap[rx][rz] = hsub
 			local i = math.random(1,8)
 			local ex = x + rippleExpand[i].x
 			local ez = z + rippleExpand[i].z
@@ -422,11 +426,11 @@ local function signUnRippleExpand()
 			addRipple(ex, ez, eh)
 		elseif hmod > 0.1 then
 			Spring.AdjustHeightMap(x, z, x+8, z+8, -0.1)
-			rippled[id][3] = hmod - 0.1
+			rippleMap[rx][rz] = hmod - 0.1
 		else
 			Spring.AdjustHeightMap(x, z, x+8, z+8, -hmod)
+			rippleMap[rx][rz] = 0
 			table.remove(rippled, id)
-			--rippled[id] = nil
 		end
 	end
 end
@@ -642,6 +646,7 @@ function gadget:Initialize()
 --	createBulgeProfile(bulgeSizeV, bulgeSizeP)
 	bulgeStamp = createBulgeStamp(bulgeSize, bulgeScale)
 	rippleExpand = createRippleExpansionMap()
+	initializeRippleMap()
 end
 
 function gadget:GameFrame(gf)
