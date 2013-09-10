@@ -57,7 +57,7 @@ local sizeX = Game.mapSizeX
 local sizeZ = Game.mapSizeZ
 local angerTimeGain = evalFrequency / 35 -- there are 30 game frames per second, so dividing this by something more makes the worm eventually die even if it has a constant supply of targets
 local evalNewVector = math.floor(16 / wormSpeed)
-local rippled = {} -- stores references to rippleMap that are actively under transformation
+local rippled = {} -- stores references to rippleMap nodes that are actively under transformation
 local rippleMap = {}-- stores locations of sand that has been raised by worm to lower it
 local bulgeProfile = {}
 local bulgeStamp = {}
@@ -352,21 +352,21 @@ local function wormLittleSign(wID, sx, sy, sz)
 	Spring.PlaySoundFile(snd,0.75,sx,sy,sz)
 end
 
-local function initializeRippleMap {
+local function initializeRippleMap()
 	for rx = 0, sizeX/8 do
 		rippleMap[rx] = {}
 		for rz = 0, sizeZ/8 do
 			rippleMap[rx][rz] = 0
 		end
 	end
-}
+end
 
 local function addRipple(x, z, hmod)
 	if hmod > 0.1 then
 		local rx = math.floor(x / 8)
 		local rz = math.floor(z / 8)
 		x = rx * 8
-		z = z * 8
+		z = rz * 8
 		if rippleMap[rx][rz] == 0 then table.insert(rippled, {rx, rz}) end
 		rippleMap[rx][rz] = rippleMap[rx][rz] + hmod
 		Spring.AdjustHeightMap(x, z, x+8, z+8, hmod)
