@@ -14,7 +14,6 @@ end
 -- configuration variables
 
 -- options that will be set by map options
-local randomAttacks = false --if true, then there is no worm sign, and a unit on the sand is picked at random to be eaten every evaluation cycle
 local maxWorms = 1 -- how many worms can be in the game at once
 local baseWormChance = 50 -- chance out of 100 that a worm will be spawned every wormEventFrequency seconds 
 local wormEventFrequency = 30 -- time in seconds between potential worm event.
@@ -580,6 +579,19 @@ local function randomSandUnit()
 	return targetID
 end
 
+local function passWormSign(x, z)
+	local allyList = Spring.GetAllyTeamList()
+	local y = Spring.GetGroundHeight(x, z)
+	for k, aID in pairs(allyList) do
+		local inRadar = Spring.IsPosInRadar(x, y, z, aID)
+		local inLos = Spring.IsPosInLos(x, y, z, aID)
+		if inRadar or inLos then
+			SendToUnsynced("passSign", aID, x, y, z, inLos)
+		end
+	end
+	SendToUnsynced("passSpectatorSign", x, y, z)
+end
+
 local function wormSpawn()
 	local w = { 1 }
 	local id = 0
@@ -597,6 +609,7 @@ local function wormSpawn()
 		local wID = id
 		worm[wID] = { x = spawnX, z = spawnZ, endSecond = math.floor(Spring.GetGameSeconds() + baseWormDuration), signSecond = Spring.GetGameSeconds() + math.random(signFreqMin, signFreqMax), lastAttackSecond = 0, vx = nil, vz = nil, tx = nil, tz = nil, hasQuaked = false}
 		wormBigSign(wID)
+		passWormSign(spawnX, spawnZ)
 	end
 end
 
@@ -623,9 +636,6 @@ function gadget:Initialize()
 	if mapOptions then
 		if mapOptions.sand_worms == "0" then
 			areWorms = false
-		end
-		if mapOptions.sworm_random_attacks == "1" then
-			randomAttacks = true
 		end
 		if mapOptions.sworm_max_worms then maxWorms = tonumber(mapOptions.sworm_max_worms) end
 		if mapOptions.sworm_base_worm_chance then baseWormChance = tonumber(mapOptions.sworm_base_worm_chance) end
@@ -713,14 +723,8 @@ function gadget:GameFrame(gf)
 		if second % wormEventFrequency == 0 and numSandUnits > 0 then
 --			Spring.Echo("potential worm event...")
 			if math.random(0, 100) < baseWormChance + numSandUnits then
-				if randomAttacks then
---					Spring.Echo("worm attack!")
-					local which = randomSandUnit()
-					wormAttack(targetID)
-				else
-					wormSpawn()
---					Spring.Echo("worm spawned!")
-				end
+				wormSpawn()
+--				Spring.Echo("worm spawned!")
 			end
 		end
 		
@@ -781,19 +785,7 @@ function gadget:GameFrame(gf)
 				end
 			end
 			if second > timeToSign+3 then
-				local allyList = Spring.GetAllyTeamList()
-				local signX = w.x
-				local signZ = w.z
-				local signY = Spring.GetGroundHeight(signX, signZ)
-				for k, aID in pairs(allyList) do
-
-					local inRadar = Spring.IsPosInRadar(signX, signY, signZ, aID)
-					local inLos = Spring.IsPosInLos(signX, signY, signZ, aID)
-					if inRadar or inLos then
-						SendToUnsynced("passSign", aID, signX, signY, signZ, inLos)
-					end
-				end
-				SendToUnsynced("passSpectatorSign", signX, signY, signZ)
+				passWormSign(w.x, w.z)
 				worm[wID].signSecond = Spring.GetGameSeconds() + math.random(signFreqMin, signFreqMax)
 				worm[wID].hasQuaked = false
 			end

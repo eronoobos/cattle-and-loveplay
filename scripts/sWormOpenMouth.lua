@@ -105,15 +105,15 @@ function swallow(idUnitToBeSwallowed)
 
 local unitx,unity,unitz=Spring.GetUnitBasePosition(unitID)
 
-Spring.PlaySoundFile(sndSandExplosion,11.25,unitx,unity,unitz)
-Spring.PlaySoundFile(sndRoarA,3.75,unitx,unity,unitz)
+Spring.PlaySoundFile(sndSandExplosion,15.0,unitx,unity,unitz)
+Spring.PlaySoundFile(sndRoarA,5.0,unitx,unity,unitz)
 
 Spring.SpawnCEG("sworm_dirt",unitx,unity,unitz,0,1,0,50,0) -- spawns some dirt and dustclouds (dirt is stolen like fire from the gods of mods - yep its smoths)
 Sleep(250) --0,25 sec wait
 openMouth() --opens Mouth
 
-Spring.PlaySoundFile(sndRoarB,3.75,unitx,unity,unitz)
-Spring.PlaySoundFile(sndRoarC,3.0,unitx,unity,unitz)
+Spring.PlaySoundFile(sndRoarB,5.0,unitx,unity,unitz)
+Spring.PlaySoundFile(sndRoarC,4.0,unitx,unity,unitz)
 
 Spring.MoveCtrl.Enable(idUnitToBeSwallowed)
 Spring.MoveCtrl.SetTrackGround(idUnitToBeSwallowed, false)
@@ -128,8 +128,8 @@ for i=1,11 do
 end
 --Sleep(1100)--we give the mouth some time so it is allready half opened when the worm breaks through the sand.
 
-Spring.PlaySoundFile(sndRoarB,2.25,unitx,unity,unitz)
-Spring.PlaySoundFile(quakeSnds[math.random(1,4)],11.25,unitx,unity,unitz)
+Spring.PlaySoundFile(sndRoarB,3.0,unitx,unity,unitz)
+Spring.PlaySoundFile(quakeSnds[math.random(1,4)],15.0,unitx,unity,unitz)
 
 local uDefID = Spring.GetUnitDefID(idUnitToBeSwallowed)
 local unitHeight = UnitDefs[uDefID].height
@@ -159,7 +159,7 @@ end
 WaitForMove(center,y_axis)
 Move(center,y_axis,-50, 4)
 
-Spring.PlaySoundFile(sndSandExplosion,9.0,unitx,unity,unitz)
+Spring.PlaySoundFile(sndSandExplosion,12.0,unitx,unity,unitz)
 
 while(true==Spring.UnitScript.IsInMove(center, y_axis)) do --spawns cegs and turns the 4fth segmet until the Worm is underground 
 randX=math.random(-25,25)

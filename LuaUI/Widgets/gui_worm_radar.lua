@@ -14,6 +14,8 @@ end
 local areWorms = true
 local signDuration = 4 -- how long in seconds each sign lasts on screen
 local flashDuration = 1/6 -- seconds per flash
+local hornPeriod = 0.5 -- seconds per alarm horn
+local hornNumber = 3 -- number of horns per alarm
 
 local alertTex = "luaui/images/sworm_alert.png"
 local arrowHoriTex = "luaui/images/sworm_arrow_hori.png"
@@ -24,9 +26,9 @@ local targetTex = "luaui/images/sworm_target.png"
 local sndSignAlarm = "sounds/sign_alarm.wav"
 
 local arrowSize = 64
-local alertSize = 128
+local alertSize = 64
 local minimapAlertSize = 20
-local minimapTargetSize = 200
+local minimapTargetSize = 150
 local alertToBottom = 0.143
 
 local maxSignBreak = 60 -- above this number of seconds between signs and it's treated as a new sign
@@ -59,17 +61,14 @@ local lastHorn = 0
 function passSign(x, y, z, los)
 --	Spring.MarkerAddPoint(x, y, z, "Worm Sign")
 --	Spring.MarkerErasePosition(x, y, z)
+--[[
 	if los then
 		local inView = Spring.IsSphereInView(x, y, z)
 		if not inView then
 			los = false
-		else
-			local camx, camy, camy = Spring.GetCameraPosition()
-			if camy > 5000 then
-				los = false
-			end
 		end
 	end
+]]--
 	-- finding an empty sign array id
 	local s = { 1 }
 	local id = 0
@@ -86,6 +85,7 @@ function passSign(x, y, z, los)
 --	Spring.Echo("new? ", distance, timebetween)
 	if (distance > maxSignDistanceBreak) or (timebetween > maxSignBreak) then
 		new = true
+		hornCount = 0
 	end
 	-- writing sign to sign array
 	sign[id] = { x = x, y = y, z = z, los = los, d = signDuration + Spring.GetGameSeconds(), new = new }
@@ -168,39 +168,43 @@ function widget:DrawScreen()
 	local second = Spring.GetGameSeconds()
 	local viewX, viewY, posX, posY = Spring.GetViewGeometry()
 	for id, s in pairs(sign) do
-		if not s.los then -- only draw osd sign if it's in radar and not visual
-			local x, y, z = Spring.WorldToScreenCoords(s.x, s.y, s.z)
-			local secondsLeft = s.d - second
-			if (x > 0) and (x < viewX) and (y > 0) and (y < viewY) then
-				if not s.los then
-					gl.Color(alertColors[alertColor].r, alertColors[alertColor].g, alertColors[alertColor].b, alertColors[alertColor].a)
-					gl.Texture(alertTex)
-					gl.TexRect(x-alertSizeHalf, y-alertSizeToBottom, x+alertSizeHalf, y+alertSize-alertSizeToBottom)
-				end
-			else
-	--			Spring.Echo("before pass", x, y, viewX, viewY)
-	--			gl.Text(arrowDir, offX, offY, 14, "cv")
-				gl.Color(1, 0.9, 0.5, alertColors[alertColor].a)
-				local x1, y1, x2, y2 = drawArrow( dirOffScreen(x, y, viewX, viewY) )
-				if x1 > x2 then
-					local xtemp = x2
-					x2 = x1
-					x1 = xtemp
-				end
-				if y1 > y2 then
-					local ytemp = y2
-					y2 = y1
-					y1 = ytemp
-				end
+		local x, y, z = Spring.WorldToScreenCoords(s.x, s.y, s.z)
+		local secondsLeft = s.d - second
+		if (x > 0) and (x < viewX) and (y > 0) and (y < viewY) then
+			-- draw osd sign if it's within the viewport
+			local camx, camy, camz = Spring.GetCameraPosition()
+			local cdx = math.abs(camx-s.x)
+			local cdy = math.abs(camy-s.y)
+			local cdz = math.abs(camz-s.z)
+			local camdist = math.sqrt(cdx^2 + cdy^2 + cdz^2)
+			if not s.los or (camdist > 5000) then -- only draw osd sign if it's in radar and not visual or if the camera is very far out
 				gl.Color(alertColors[alertColor].r, alertColors[alertColor].g, alertColors[alertColor].b, alertColors[alertColor].a)
 				gl.Texture(alertTex)
-				gl.TexRect(x1, y1, x2, y2)
+				gl.TexRect(x-alertSizeHalf, y-alertSizeToBottom, x+alertSizeHalf, y+alertSize-alertSizeToBottom)
 			end
+		else
+			-- draw arrow at edge of screen if the sign is out of the viewport
+			gl.Color(1, 0.9, 0.5, alertColors[alertColor].a)
+			local x1, y1, x2, y2 = drawArrow( dirOffScreen(x, y, viewX, viewY) )
+			if x1 > x2 then
+				local xtemp = x2
+				x2 = x1
+				x1 = xtemp
+			end
+			if y1 > y2 then
+				local ytemp = y2
+				y2 = y1
+				y1 = ytemp
+			end
+			gl.Color(alertColors[alertColor].r, alertColors[alertColor].g, alertColors[alertColor].b, alertColors[alertColor].a)
+			gl.Texture(alertTex)
+			gl.TexRect(x1, y1, x2, y2)
 		end
-		-- play one alarm horn if new and more than a second later
-		if s.new and (second > lastHorn + 1) then
+		-- play one alarm horn if new and more than hornPeriod seconds later
+		if s.new and (second > lastHorn + hornPeriod) and (hornCount < hornNumber)  then
 			Spring.PlaySoundFile(sndSignAlarm, 0.1)
 			lastHorn = second
+			hornCount = hornCount + 1
 		end
 		-- remove sign if it's above duration
 		if second > s.d then

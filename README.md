@@ -175,7 +175,7 @@ before releasing v5 w- / sand worms (- / means it's done):
 	- / lightning icon w/o outline, should alpha-flash in bright red or pink
 	- / distinguish between radar signs and LOS signs. if it's an LOS sign, it shouldn't be visible except as an arrow off-screen
 	- / play an alarm ( a not so annoying one )
-- make option to make worms not eat mexes
+- / make option to make worms not eat mexes
 - bug: if unit is destroyed in the middle of swallow, bad things happen and worm doesn't die
 - scale worm according to unit size? could be done by making several versions in upspring, maybe diameter 64 through diameter 256, going up by 64.
 - use movectrl instead of attaching

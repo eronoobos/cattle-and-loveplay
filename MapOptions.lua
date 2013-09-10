@@ -51,18 +51,9 @@ local options = {
 	},
 	
 	{
-		key	= 'sworm_random_attacks',
-		name	= 'Random Attacks',
-		desc	= 'Rather than moving under the sand, worms will simply appear underneath any unit on the sand at random and attack.',
-		type	= 'bool',
-		section = 'sworm_sect',
-		def	= 'false',
-	},
-	
-	{
 		key	= 'sworm_max_worms',
 		name	= 'Maximum Worms',
-		desc	= 'Sand worms will eat your units on the sand.',
+		desc	= 'The maximum number of worms that can be active on the map at once.',
 		type   = "number",
 		section = 'sworm_sect',
 		   def    = 1,
@@ -74,19 +65,19 @@ local options = {
 	{
 		key	= 'sworm_base_worm_chance',
 		name	= 'Base Spawn Chance',
-		desc	= 'The percentage of cases that a worm will be spawned every time a worm event occurs. Each unit on the sand will at 1% to this.',
+		desc	= 'The percentage of cases that a worm will be spawned when a worm spawning event occurs. Each unit on the sand will at 1% to this.',
 		type   = "number",
 		section = 'sworm_sect',
 		   def    = 50,
-		   min    = 5,
+		   min    = 10,
 		   max    = 100,
-		   step   = 5,
+		   step   = 10,
 	},
 	
 	{
 		key	= 'sworm_worm_event_frequency',
-		name	= 'Event Delay',
-		desc	= 'Seconds between worm events.',
+		name	= 'Spawn Event Period',
+		desc	= 'Seconds between potential worm spawning events.',
 		type   = "number",
 		section = 'sworm_sect',
 		   def    = 30,
@@ -97,7 +88,7 @@ local options = {
 	
 	{
 		key	= 'sworm_base_worm_duration',
-		name	= 'Base Life Duration',
+		name	= 'Base Lifespan',
 		desc	= 'Seconds a worm lives if no units are within its sensing range',
 		type   = "number",
 		section = 'sworm_sect',
@@ -114,7 +105,7 @@ local options = {
 		type   = "number",
 		section = 'sworm_sect',
 		   def    = 1,
-		   min    = 0.25,
+		   min    = 0.5,
 		   max    = 2,
 		   step   = 0.25,
 	},
