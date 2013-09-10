@@ -1,0 +1,28 @@
+return {
+	sworm = {
+		blocking = false,
+		buildPic = "sworm.png",
+		canMove = true,
+		description = "Giant hungry beast.",
+		footprintX = 6,
+		footprintZ = 6,
+		holdSteady = true,
+		iconType = "sworm",
+		isFirePlatform = true,
+		isTransport = true,
+		levelGround = false,
+		loadingRadius = 256,
+		maxDamage = 9999,
+		name = "Sand Worm",
+		objectName = "swormOpenMouth-180_50out-r45.s3o",
+		script = [[sWormOpenMouth.lua]],
+		stealth = true,
+		transmaxunits = [[10]],
+		transportCapacity = 100,
+  		transportMass = 50000,
+ 		transportSize = 10000,
+		customParams = {
+ 			ignoreplacementrestriction = true,
+		},
+	},
+}
