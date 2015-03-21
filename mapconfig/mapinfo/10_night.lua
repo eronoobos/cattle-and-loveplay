@@ -23,8 +23,8 @@ end
 ------------------------------------------------------------
 -- Relative Settings
 
-local blueShift = {0.25, 0.25, 0.25}
-local blackShift = {0.057, 0.057, 0.057}
+local blueShift = {0.5, 0.5, 1.0}
+local blackShift = {0.1, 0.1, 0.25}
 
 ColorShift("lighting.groundambientcolor",  blueShift)
 ColorShift("lighting.grounddiffusecolor",  blueShift)
@@ -32,8 +32,13 @@ ColorShift("lighting.groundspecularcolor", blueShift)
 ColorShift("lighting.unitambientcolor",    blueShift)
 ColorShift("lighting.unitdiffusecolor",    blueShift)
 ColorShift("lighting.unitspecularcolor",   blueShift)
-Scale("lighting.groundshadowdensity", 0.1)
-Scale("lighting.unitshadowdensity",   0.1)
+Scale("lighting.groundshadowdensity", 0.4)
+Scale("lighting.unitshadowdensity",   0.4)
+
+ColorShift("atmosphere.skycolor", blackShift)
+ColorShift("atmosphere.fogcolor", blackShift)
+Scale("atmosphere.fogstart", 0.5)
+Scale("atmosphere.fogend",   0.7)
 
 ColorShift("water.planecolor",   blackShift)
 ColorShift("water.surfaceColor", blueShift)
@@ -44,26 +49,9 @@ Scale("water.surfaceAlpha", 1.5)
 -- Absolute Settings
 
 local cfg = {
-	resources = {
-		detailTex = "cont_DET_dark.bmp",
-	},
-
-	lighting = {
-		sunDir              = {-0.25, 1, -0.25, 1e9},
-	},
-
-	water = {
-		numTiles             = 2,
-		normalTexture        = "waterbump2.png",
-		perlinStartFreq      = 12.50,
-		perlinLacunarity     = 1.60,
-		perlinAmplitude      = 0.24,
-		diffuseFactor        = 0.40,
-		specularFactor       = 0.50,
-		specularPower        = 76,
-		ambientFactor        = 0.00,
-
-		reflectionDistortion = 0.60,
+	atmosphere = {
+		suncolor     = {0.5, 0.5, 0.3},
+		cloudColor   = {0, 0, 0},
 	},
 }
 
