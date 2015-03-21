@@ -29,14 +29,15 @@ local occupyThis
 local unitOccupies
 
 -- doInit() will set this to a list of unit def IDs that can't be built on sand    
-local isNotValid
+local isNotValid = {}
 
-local sinkCount
-local sunkHeight
-local sinkRadius
+local sinkCount = 0
+local sunkHeight = {}
+local sinkRadius = {}
+local sinkUnit = {}
 
-local fSinkCount
-local fSinkSpeed
+local fSinkCount = 0
+local fSinkSpeed = {}
 --local fSunkHeight --not needed unless wrecks actually sinking is possible
 
 
@@ -130,7 +131,8 @@ local function loadReReDir()
 end
 
 
--- callins
+-- synced
+if gadgetHandler:IsSyncedCode() then
 
 function gadget:Initialize()
 	local mapOptions = Spring.GetMapOptions()
@@ -142,6 +144,11 @@ function gadget:Initialize()
 		if mapOptions.sink_wrecks == "0" then
 			sinkWrecks = false
 		end
+	end
+	if not restrictSand and not sinkWrecks then
+		Spring.Echo("Sand build restriction and wreck sinking are disabled. Removing gadget.")
+		gadgetHandler:RemoveGadget()
+		return
 	end
 	
 	if restrictSand then
@@ -429,10 +436,13 @@ function gadget:UnitFinished(unitID, unitDefID, teamID)
 	end
 end
 
+end
+-- end synced
+
 
 -- unsynced --
-
 if not gadgetHandler:IsSyncedCode() then
+
 	local function isNotValidToLuaUI(_,uDefID)
 	  if (Script.LuaUI('passIsNotValid')) then
 		Script.LuaUI.passIsNotValid(uDefID)

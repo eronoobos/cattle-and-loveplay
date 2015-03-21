@@ -18,9 +18,9 @@ return {
 		script = [[sWormOpenMouth.lua]],
 		stealth = true,
 		transmaxunits = [[10]],
-		transportCapacity = 100,
-  		transportMass = 50000,
- 		transportSize = 10000,
+		transportCapacity = 1000,
+  		transportMass = 500000,
+ 		transportSize = 100000,
 		customParams = {
  			ignoreplacementrestriction = true,
 		},

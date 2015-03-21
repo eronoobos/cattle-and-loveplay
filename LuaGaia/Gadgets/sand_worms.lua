@@ -178,7 +178,7 @@ local function createBulgeStamp(size, scale)
 			local z = (zi-1) * scale
 			stamp[i] = { x = x, z = z, h = h }
 			i = i + 1
-			Spring.Echo(x, z, h, d, dx, dz, dix, diz)
+			-- Spring.Echo(x, z, h, d, dx, dz, dix, diz)
 		end
 	end
 	return stamp
@@ -629,7 +629,8 @@ local function wormAttack(targetID)
 end
 
 
--- callins
+-- synced
+if gadgetHandler:IsSyncedCode() then
 
 function gadget:Initialize()
 	local mapOptions = Spring.GetMapOptions()
@@ -648,6 +649,7 @@ function gadget:Initialize()
 	end
 	if not areWorms then
 		Spring.Echo("Sand worms are not enabled. Sand worm gadget disabled.")
+		gadgetHandler:RemoveGadget()
 		return
 	end
 	sandUnitValues = getSandUnitValues()
@@ -795,7 +797,6 @@ function gadget:GameFrame(gf)
 end
 
 function gadget:UnitDestroyed(unitID, unitDefID, teamID, attackerID, attackerDefID, attackerTeamID)
-
 	-- remove from units on sand table
 	if sandUnits[unitID] then
 		sandUnits[unitID] = nil
@@ -807,13 +808,15 @@ function gadget:UnitDestroyed(unitID, unitDefID, teamID, attackerID, attackerDef
 	if isEmergedWorm[unitID] then
 		isEmergedWorm[unitID] = nil
 	end
-	
 end
+
+end
+-- end synced
 
 
 -- unsynced
-
 if not gadgetHandler:IsSyncedCode() then
+
 	local function wormToLuaUI(_, wID, x, z, vx, vz, nvx, nvz, tx, tz, signSecond, endSecond)
 	  if (Script.LuaUI('passWorm')) then
 		Script.LuaUI.passWorm(wID, x, z, vx, vz, nvx, nvz, tx, tz, signSecond, endSecond)
@@ -847,4 +850,5 @@ if not gadgetHandler:IsSyncedCode() then
 	  gadgetHandler:AddSyncAction('passSign', signToLuaUI)
 	  gadgetHandler:AddSyncAction('passSpectatorSign', specSignToLuaUI)
 	end
+	
 end

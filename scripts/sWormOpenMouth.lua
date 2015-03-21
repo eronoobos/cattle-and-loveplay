@@ -104,6 +104,7 @@ end
 function swallow(idUnitToBeSwallowed)
 
 local unitx,unity,unitz=Spring.GetUnitBasePosition(unitID)
+-- Spring.Echo("init", Spring.GetUnitBasePosition(idUnitToBeSwallowed))
 
 Spring.PlaySoundFile(sndSandExplosion,15.0,unitx,unity,unitz)
 Spring.PlaySoundFile(sndRoarA,5.0,unitx,unity,unitz)
@@ -118,6 +119,7 @@ Spring.PlaySoundFile(sndRoarC,4.0,unitx,unity,unitz)
 Spring.MoveCtrl.Enable(idUnitToBeSwallowed)
 Spring.MoveCtrl.SetTrackGround(idUnitToBeSwallowed, false)
 AttachUnit(foodmagnet, idUnitToBeSwallowed)
+-- Spring.Echo("attached", Spring.GetUnitBasePosition(idUnitToBeSwallowed))
 
 Move(center,y_axis,80, 16)-- the whole thing is wheighting tons of tons, so propelling itself out of the sand, slows it down
 for i=1,11 do
@@ -146,6 +148,7 @@ for i=1,11 do
 	Sleep(100)
 end
 if (Spring.ValidUnitID (idUnitToBeSwallowed)) then -- this assures, that the unit in the mouth is alive until the very last moment
+		-- Spring.Echo("death", Spring.GetUnitBasePosition(idUnitToBeSwallowed))
       Spring.DestroyUnit (idUnitToBeSwallowed,false,true) --this destroys the unit without wreckage. Knorke teached me that. If you want to know something, ask him. Its helpfull AND entertaining, to be his pupil.
 end
 

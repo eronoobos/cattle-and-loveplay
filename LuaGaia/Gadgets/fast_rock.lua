@@ -10,6 +10,9 @@ function gadget:GetInfo()
    }
 end
 
+-- synced
+if gadgetHandler:IsSyncedCode() then
+
 function gadget:GameStart()
 	local mapOptions = Spring.GetMapOptions()
 	if mapOptions then
@@ -19,3 +22,6 @@ function gadget:GameStart()
 		end
 	end
 end
+
+end
+-- end synced
