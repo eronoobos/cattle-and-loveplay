@@ -151,6 +151,28 @@ local options = {
 		def    = 'false',
 	},
 	
+		{
+		key  = 'Economy',
+		name = 'Economy Settings',
+		desc = '',
+		type = 'section',
+	},
+
+	{
+		key  = 'metal',
+		name = 'Metal Production',
+		desc = 'Metal production levels - How much metal is produced per second',
+		type = 'list',
+		section = 'Economy',
+		def  = 'normal',
+		items	= {
+			{ key = 'low', name = "1.0 Low", desc = "Low, 1.0 metal per spot" },
+			{ key = 'normal', name = "1.5 Default", desc = "Default, 1.5 metal per spot" },
+			{ key = 'high', name = "2.0 High", desc = "High, 2.0 metal per spot" },
+			{ key = 'superhigh', name = "3.0 Superhigh", desc = "Superhigh, 3.0 metal per spot" },
+		},
+	},
+
 }
 
 return options
