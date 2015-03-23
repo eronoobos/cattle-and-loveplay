@@ -6,7 +6,6 @@ return {
 		description = "Giant hungry beast.",
 		footprintX = 6,
 		footprintZ = 6,
-		holdSteady = true,
 		iconType = "sworm",
 		isFirePlatform = true,
 		isTransport = true,

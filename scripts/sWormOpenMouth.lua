@@ -10,6 +10,7 @@ local sWormMout3 = piece "sWormMout3"
 local foodmagnet = piece "foodmagnet"
 
 local AttachUnit = Spring.UnitScript.AttachUnit
+local DropUnit = Spring.UnitScript.DropUnit
 
 local sndRoarA = "sounds/reverse_scream.wav"
 local sndRoarB = "sounds/cobra.wav"
@@ -36,6 +37,7 @@ if (x and y and z) then
 		for _, nearunitid in ipairs (nearunits) do
 			if (nearunitid~=unitID) then
 				swallow(nearunitid)
+				-- SwallowTest(nearunitid)
 				break
 			end
 		end
@@ -101,6 +103,11 @@ Turn(sWormMout1,x_axis,math.rad(0),2)
 Turn(sWormMout3,x_axis,math.rad(0),2)
 end
 
+function SwallowTest(idUnitToBeSwallowed)
+	AttachUnit(foodmagnet, idUnitToBeSwallowed)
+	Sleep(5000)
+end
+
 function swallow(idUnitToBeSwallowed)
 
 local unitx,unity,unitz=Spring.GetUnitBasePosition(unitID)
@@ -120,7 +127,6 @@ Spring.MoveCtrl.Enable(idUnitToBeSwallowed)
 Spring.MoveCtrl.SetTrackGround(idUnitToBeSwallowed, false)
 AttachUnit(foodmagnet, idUnitToBeSwallowed)
 -- Spring.Echo("attached", Spring.GetUnitBasePosition(idUnitToBeSwallowed))
-
 Move(center,y_axis,80, 16)-- the whole thing is wheighting tons of tons, so propelling itself out of the sand, slows it down
 for i=1,11 do
 	randX=math.random(-25,25)
