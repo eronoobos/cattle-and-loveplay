@@ -14,15 +14,24 @@ end
 -- configuration variables
 
 -- options that will be set by map options
-local maxWorms = 1 -- how many worms can be in the game at once
-local baseWormChance = 50 -- chance out of 100 that a worm will be spawned every wormEventFrequency seconds 
-local wormEventFrequency = 30 -- time in seconds between potential worm event.
-local baseWormDuration = 45
 local wormSpeed = 1.0 -- how much the worm's vector is multiplied by to produce a position each game frame
-local wormSensingRange = 1500 -- the range within which a unit will add to a worm's "anger" (i.e. will keep the worm from leaving)
 local wormEatMex = false -- will worms eat metal extractors?
+local wormAggression = 5 -- translates into movementPerWormAnger and unitsPerWormAnger
+
+-- config modified later by map options
+local wormRange = 150 -- range within which worm will attack
+local movementPerWormAnger = 100000 / wormAggression -- how much total movement (sum x+y distance per eval frequency of each unit) makes up 1 wormAnger
+local unitsPerWormAnger = 500 / wormAggression
 
 -- non mapoption config
+local wormEventFrequency = 30 -- time in seconds between potential worm event.
+local baseWormChance = 50 -- chance out of 100 that a worm will be spawned every wormEventFrequency seconds (changed by wormAnger)
+local baseWormDuration = 60 -- how long does worm have to target initially
+local wormChaseTimeMod = 1.5 -- how much to multiply the as-the-crow-flies estimated time of arrival at target
+local wormNextDelay = 15 -- seconds to wait to spawn a new worm after one dies
+local distancePerValue = 2000 -- how value converts to distance, to decide between close vs valuable targets
+local mexValue = -200
+local hoverValue = -300
 local wormSignFrequency = 15 -- average time in seconds between worm signs (varies + or - 50%)
 local sandType = "Sand" -- the ground type that worm spawns in
 local wormEmergeUnitName = "sworm" -- what unit the worms emerge and attack as
@@ -34,16 +43,19 @@ local bulgeSize = 7
 local bulgeScale = 8
 local attackDelay = 12 -- delay between worm attacks
 local cellSize = 64 -- for wormReDir
-local evalFrequency = 200 -- game frames between evaluation of units on sand
+local evalFrequency = 150 -- game frames between evaluation of units on sand
 local signEvalFrequency = 12 -- game frames between parts of a wormsign volley (lower value means more lightning strikes per sign)
-local wormRange = 150 -- range within which worm will attack
 
 
 -- storage variables
-
+local maxWorms = 1 -- how many worms can be in the game at once (changes with wormAnger)
+local wormAnger = 0.1 -- non integer form of above (changed by wormTargetting)
+local nextPotentialEvent = wormEventFrequency
 local areWorms = true -- will be set to false if the map option sand_worms is off
 local sandUnits = {} -- sandUnits[unitID] = true are on sand
+local sandUnitPosition = {}
 local numSandUnits = 0
+local totalSandMovement = 0
 local sandUnitValues = {} -- sandUnitValues[unitDefID] = value (the amount it attracts the worm
 local worm = {} -- x, z, tx, tz, vx, vz, nvx, nvz, signSecond, lastAttackSecond, endSecond, favoredSide
 local signFreqMin = wormSignFrequency / 2 -- the minimum pause between worm signs
@@ -54,7 +66,6 @@ local isEmergedWorm = {} -- is unitID an emerged attacking worm?
 local halfCellSize = cellSize / 2
 local sizeX = Game.mapSizeX 
 local sizeZ = Game.mapSizeZ
-local angerTimeGain = evalFrequency / 35 -- there are 30 game frames per second, so dividing this by something more makes the worm eventually die even if it has a constant supply of targets
 local evalNewVector = math.floor(16 / wormSpeed)
 local rippled = {} -- stores references to rippleMap nodes that are actively under transformation
 local rippleMap = {}-- stores locations of sand that has been raised by worm to lower it
@@ -88,6 +99,11 @@ local electricSnds = { sndElectricSpark, sndElectricLadder, sndElectricFizzle }
 
 
 -- functions
+
+-- y is not random, but zero
+local function randomXYZ()
+	return math.random(sizeX), 0, math.random(sizeZ)
+end
 
 local function loadWormReDir()
 	local reDirSize = VFS.Include('data/sand_worm_redirect_size.lua')
@@ -129,15 +145,15 @@ local function getSandUnitValues()
 	middle = middle ^ 0.3
 	Spring.Echo(highest, lowest, range, average, middle)
 	for uDefID, uDef in pairs(UnitDefs) do
-		local cost = math.floor( uDef.metalCost + (uDef.energyCost / 50) )
-		local fract = (cost - lowest) / range
-		fract = fract ^ middle
-		vals[uDefID] = math.floor( wormSensingRange * 0.67 * fract )
 		if uDef.extractsMetal > 0 then
-			vals[uDefID] = -math.floor(wormSensingRange * 0.2)
-		end
-		if uDef.canHover then
-			vals[uDefID] = -math.floor(wormSensingRange * 0.3)
+			vals[uDefID] = mexValue
+		elseif uDef.canHover then
+			vals[uDefID] = hoverValue
+		else
+			local cost = math.floor( uDef.metalCost + (uDef.energyCost / 50) )
+			local fract = (cost - lowest) / range
+			fract = fract ^ middle
+			vals[uDefID] = math.floor(distancePerValue * fract)
 		end
 --		Spring.Echo(uDef.name, uDef.humanName, uDef.tooltip, vals[uDefID], cost, uDef.metalCost, uDef.energyCost, uDef.mass, fract)
 	end
@@ -217,6 +233,7 @@ local function nearestSand(ix, iz)
 end
 
 local function wormTargetting()
+	local currentSecond = Spring.GetGameSeconds()
 	local units = Spring.GetAllUnits()
 	local num = 0
 	local bestDist = {}
@@ -224,11 +241,11 @@ local function wormTargetting()
 		bestDist[wID] = 9999
 	end
 	-- for debugging
-	for uID, b in pairs(sandUnits) do
+	-- for uID, b in pairs(sandUnits) do
 --		SendToUnsynced("passSandUnit", uID, nil) --uncomment this for debug info (along with line farther down)
-	end
+	-- end
+	totalMovement = 0
 	sandUnits = {}
-	local alreadyAngered = {}
 	for k, uID in pairs(units) do
 		--if unit enters sand, add it to the sand unit table, if it exits, remove it
 		if not isEmergedWorm[uID] then
@@ -241,6 +258,15 @@ local function wormTargetting()
 				if not wormEatMex and (uDef.extractsMetal > 0) then
 					-- don't target mexes if mapoption says no
 				else
+					if sandUnitPosition[uID] then
+						-- add how much the unit has moved since last evaluation to total movement sum
+						local dx = math.abs(sandUnitPosition[uID].x - ux)
+						local dz = math.abs(sandUnitPosition[uID].z - uz)
+						if dx > 0 or dz > 0 then
+							totalMovement = totalMovement + dx + dz + uDef.metalCost
+						end
+					end
+					sandUnitPosition[uID] = {x = ux, z = uz}
 					sandUnits[uID] = true
 					num = num + 1
 					local uval = sandUnitValues[uDefID]
@@ -252,24 +278,28 @@ local function wormTargetting()
 						local distx = math.abs(ux - x)
 						local distz = math.abs(uz - z)
 						local dist = math.sqrt((distx*distx) + (distz*distz))
-						if dist - uval < wormSensingRange then
-		--					Spring.Echo(wID, "sensed unit", uID, "at", ux, uz)
-							if not alreadyAngered[wID] then
-								worm[wID].endSecond = worm[wID].endSecond + angerTimeGain 
-								alreadyAngered[wID] = true
-							end
-							if dist - uval < bestDist[wID] then
+	--					Spring.Echo(wID, "sensed unit", uID, "at", ux, uz)
+						if dist - uval < bestDist[wID] then
+							if uval < 0 then
+								-- for negative values (mexes and hovers)
+								-- target badly, like a wandering radar blip
+								local j = -uval
+								local jx = (math.random() * j * 2) - j
+								local jz = (math.random() * j * 2) - j
+								local tx, tz = nearestSand(worm[wID].tx + jx, worm[wID].tz + jz)
+								worm[wID].tx = tx
+								worm[wID].tz = tz
+							else
 								worm[wID].tx = ux
 								worm[wID].tz = uz
-								if uval < 0 then
-									local j = -uval
-									local jx = (math.random() * j * 2) - j
-									local jz = (math.random() * j * 2) - j
-									local tx, tz = nearestSand(worm[wID].tx + jx, worm[wID].tz + jz)
-									worm[wID].tx = tx
-									worm[wID].tz = tz
-								end
-								bestDist[wID] = dist - uval
+							end
+							bestDist[wID] = dist - uval
+							if w.fresh then
+								-- give enough time to get to the worm's first target
+								local eta = math.ceil((wormSpeed / 30) * wormChaseTimeMod * dist)
+								w.endSecond = currentSecond + eta
+								-- Spring.Echo("ETA", eta)
+								w.fresh = false
 							end
 						end
 					end
@@ -277,7 +307,7 @@ local function wormTargetting()
 			end
 		end
 	end
-	return num
+	return num, math.ceil(totalMovement)
 end
 
 local function signLightning(x, y, z)
@@ -600,14 +630,10 @@ local function wormSpawn()
 		w = worm[id]
 	until not w
 	if id <= maxWorms then
-		local uID = randomSandUnit()
-		local x, y, z = Spring.GetUnitPosition(uID)
-		local rvx, rvz = normalizeVector( (math.random()*2)-1, (math.random()*2)-1 )
-		local away = wormSensingRange * 0.5
-		local spawnX, spawnZ = nearestSand( x+(rvx*away), z+(rvz*away) )
---		local spawnX, spawnZ = nearestSand(math.random(halfCellSize, sizeX-halfCellSize), math.random(halfCellSize, sizeZ-halfCellSize))
+		local x, y, z = randomXYZ()
+		local spawnX, spawnZ = nearestSand(x, z)
 		local wID = id
-		worm[wID] = { x = spawnX, z = spawnZ, endSecond = math.floor(Spring.GetGameSeconds() + baseWormDuration), signSecond = Spring.GetGameSeconds() + math.random(signFreqMin, signFreqMax), lastAttackSecond = 0, vx = nil, vz = nil, tx = nil, tz = nil, hasQuaked = false}
+		worm[wID] = { x = spawnX, z = spawnZ, endSecond = math.floor(Spring.GetGameSeconds() + baseWormDuration), signSecond = Spring.GetGameSeconds() + math.random(signFreqMin, signFreqMax), lastAttackSecond = 0, vx = nil, vz = nil, tx = nil, tz = nil, hasQuaked = false, fresh = true}
 		wormBigSign(wID)
 		passWormSign(spawnX, spawnZ)
 	end
@@ -616,6 +642,7 @@ end
 local function wormDie(wID)
 --	Spring.Echo(wID, "died")
 	worm[wID] = nil
+	nextPotentialEvent = nextPotentialEvent + wormNextDelay
 --	SendToUnsynced("passWorm", wID, nil)
 end
 
@@ -638,12 +665,9 @@ function gadget:Initialize()
 		if mapOptions.sand_worms == "0" then
 			areWorms = false
 		end
-		if mapOptions.sworm_max_worms then maxWorms = tonumber(mapOptions.sworm_max_worms) end
-		if mapOptions.sworm_base_worm_chance then baseWormChance = tonumber(mapOptions.sworm_base_worm_chance) end
-		if mapOptions.sworm_worm_event_frequency then wormEventFrequency = tonumber(mapOptions.sworm_worm_event_frequency) end
-		if mapOptions.sworm_base_worm_duration then baseWormDuration = tonumber(mapOptions.sworm_base_worm_duration) end
+		if mapOptions.sworm_aggression then wormAggression = tonumber(mapOptions.sworm_aggression) end
+		movementPerWormAnger = 100000 / wormAggression
 		if mapOptions.sworm_worm_speed then wormSpeed = tonumber(mapOptions.sworm_worm_speed) end
-		if mapOptions.sworm_worm_sensing_range then wormSensingRange = tonumber(mapOptions.sworm_worm_sensing_range) end
 		wormRange = ((wormSpeed * evalFrequency) / 2) + 50
 		if mapOptions.sworm_eat_mex == "1" then wormEatMex = true end
 	end
@@ -719,15 +743,21 @@ function gadget:GameFrame(gf)
 		end
 		
 		-- do targetting of units on sand
-		numSandUnits = wormTargetting()
+		numSandUnits, totalSandMovement = wormTargetting()
+
+		-- calculate worm anger
+		wormAnger = ((numSandUnits + 1) / unitsPerWormAnger) + ((totalSandMovement + 1) / movementPerWormAnger)
+		maxWorms = math.ceil(wormAnger)
+		-- Spring.Echo(numSandUnits, totalSandMovement, wormAnger, maxWorms, unitsPerWormAnger, movementPerWormAnger)
 		
 		-- spawn worms
-		if second % wormEventFrequency == 0 and numSandUnits > 0 then
+		if numSandUnits and second >= nextPotentialEvent then
 --			Spring.Echo("potential worm event...")
-			if math.random(0, 100) < baseWormChance + numSandUnits then
+			if math.random(0, 100) < baseWormChance * (1+wormAnger) then
 				wormSpawn()
 --				Spring.Echo("worm spawned!")
 			end
+			nextPotentialEvent = second + wormEventFrequency
 		end
 		
 		-- calculate vectors
@@ -800,6 +830,7 @@ function gadget:UnitDestroyed(unitID, unitDefID, teamID, attackerID, attackerDef
 	-- remove from units on sand table
 	if sandUnits[unitID] then
 		sandUnits[unitID] = nil
+		sandUnitPosition[unitID] = nil
 		numSandUnits = numSandUnits - 1
 --		SendToUnsynced("passSandUnit", uID, nil)
 	end
@@ -809,6 +840,7 @@ function gadget:UnitDestroyed(unitID, unitDefID, teamID, attackerID, attackerDef
 		isEmergedWorm[unitID] = nil
 	end
 end
+
 
 end
 -- end synced

@@ -71,51 +71,15 @@ local options = {
 	},
 
 	{
-		key	= 'sworm_max_worms',
-		name	= 'Maximum Worms',
-		desc	= 'The maximum number of worms that can be active on the map at once.',
+		key	= 'sworm_aggression',
+		name	= 'Worm Aggression',
+		desc	= 'How much do your units on the sand attract more worms?',
 		type   = "number",
 		section = '2_sworm_sect',
-		   def    = 1,
+		   def    = 5,
 		   min    = 1,
-		   max    = 8,
+		   max    = 10,
 		   step   = 1,
-	},
-	
-	{
-		key	= 'sworm_base_worm_chance',
-		name	= 'Base Spawn Chance',
-		desc	= 'The percentage of cases that a worm will be spawned when a worm spawning event occurs. Each unit on the sand will at 1% to this.',
-		type   = "number",
-		section = '2_sworm_sect',
-		   def    = 50,
-		   min    = 10,
-		   max    = 100,
-		   step   = 10,
-	},
-	
-	{
-		key	= 'sworm_worm_event_frequency',
-		name	= 'Spawn Event Period',
-		desc	= 'Seconds between potential worm spawning events.',
-		type   = "number",
-		section = '2_sworm_sect',
-		   def    = 30,
-		   min    = 15,
-		   max    = 300,
-		   step   = 15,
-	},
-	
-	{
-		key	= 'sworm_base_worm_duration',
-		name	= 'Base Lifespan',
-		desc	= 'Seconds a worm lives if no units are within its sensing range',
-		type   = "number",
-		section = '2_sworm_sect',
-		   def    = 45,
-		   min    = 15,
-		   max    = 120,
-		   step   = 15,
 	},
 	
 	{
@@ -128,18 +92,6 @@ local options = {
 		   min    = 0.5,
 		   max    = 2,
 		   step   = 0.25,
-	},
-	
-	{
-		key	= 'sworm_worm_sensing_range',
-		name	= 'Attack Range',
-		desc	= 'How far away in elmos the worm can sense units.',
-		type   = "number",
-		section = '2_sworm_sect',
-		   def    = 1500,
-		   min    = 500,
-		   max    = 5000,
-		   step   = 500,
 	},
 
 	{

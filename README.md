@@ -189,3 +189,14 @@ september 7, 2013:
 - / flashing lightning marker only if the worm is off screen or if the view distance is far away
 	- / and only if it's in radar LOS and *not* in visual LOS
 - dust only in visual LOS (it seems to be showing even if it's in radar los)
+
+---
+
+march 17, 2016:
+
+- / random unit to spawn near makes clumps of low-value units more likely to attract the worm, which is too easy to exploit. random location, and a base lifespan that's ETA to next target
+- / when worm 'dies', the next spawn event should be delayed, so that a new worm doesn't spawn instantly across the map
+- / reduce attack range to 120?
+- / unit value should matter more
+- / scrap concept of sensing range
+- / more units moving across sand should escalate everything, even in extreme cases adding more worms
