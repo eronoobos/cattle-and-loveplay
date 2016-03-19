@@ -55,4 +55,20 @@ return {
       },
     },
   },
+  ["sworm_bulge"] = {
+    distort01 = {
+      air = true,
+      class = [[CSimpleGroundFlash]],
+      count = 1,
+      ground = true,
+      properties = {
+        size = 50,
+        sizegrowth = 10,
+        ttl = 150,
+        texture = [[sworm_dirt]],
+        colormap = [[0.7 0.6 0.5 1.0 0.5 0.4 0.3 1.0]],
+        -- colormap = [[0.7 0.6 0.5 1.0 0.5 0.4 0.3 1.0 0.3 0.2 0.1 1.0]]
+      },
+    },
+  },
 }

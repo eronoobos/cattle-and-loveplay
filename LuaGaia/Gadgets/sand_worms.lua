@@ -24,10 +24,13 @@ local movementPerWormAnger = 100000 / wormAggression -- how much total movement 
 local unitsPerWormAnger = 500 / wormAggression
 
 -- non mapoption config
+local boxSize = 1024 -- for finding occupied areas to spawn worms near
+local wormSpawnDistance = 1000 -- how far away from occupied area to spawn worm
+local biteHeight = 32 -- how high above ground in elmos will the worm target and eat units
 local wormEventFrequency = 30 -- time in seconds between potential worm event.
 local baseWormChance = 50 -- chance out of 100 that a worm will be spawned every wormEventFrequency seconds (changed by wormAnger)
 local baseWormDuration = 60 -- how long does worm have to target initially
-local wormChaseTimeMod = 1.5 -- how much to multiply the as-the-crow-flies estimated time of arrival at target
+local wormChaseTimeMod = 1.75 -- how much to multiply the as-the-crow-flies estimated time of arrival at target
 local wormNextDelay = 15 -- seconds to wait to spawn a new worm after one dies
 local distancePerValue = 2000 -- how value converts to distance, to decide between close vs valuable targets
 local mexValue = -200
@@ -35,11 +38,11 @@ local hoverValue = -300
 local wormSignFrequency = 15 -- average time in seconds between worm signs (varies + or - 50%)
 local sandType = "Sand" -- the ground type that worm spawns in
 local wormEmergeUnitName = "sworm" -- what unit the worms emerge and attack as
+local rippleNumMin = 5
+local rippleNumMax = 10
 local rippleHeight = 1.5 -- height of ripples that worm makes in the sand
 local bulgeHeight = 1.5
-local bulgeSizeV = 5
-local bulgeSizeP = 4
-local bulgeSize = 7
+local bulgeSize = 8
 local bulgeScale = 8
 local attackDelay = 12 -- delay between worm attacks
 local cellSize = 64 -- for wormReDir
@@ -48,9 +51,11 @@ local signEvalFrequency = 12 -- game frames between parts of a wormsign volley (
 
 
 -- storage variables
+local halfBoxSize = boxSize / 2
+local occupiedBoxes = {}
 local maxWorms = 1 -- how many worms can be in the game at once (changes with wormAnger)
 local wormAnger = 0.1 -- non integer form of above (changed by wormTargetting)
-local nextPotentialEvent = wormEventFrequency
+local nextPotentialEvent = 0 -- when the next worm event is. see wormTargetting() and Initialize()
 local areWorms = true -- will be set to false if the map option sand_worms is off
 local sandUnits = {} -- sandUnits[unitID] = true are on sand
 local sandUnitPosition = {}
@@ -210,6 +215,18 @@ local function createRippleExpansionMap()
 	return emap
 end
 
+local function mapClampX(x)
+	return math.max(math.min(x, sizeX), 0)
+end
+
+local function mapClampZ(z)
+	return math.max(math.min(z, sizeZ), 0)
+end
+
+local function mapClampXZ(x, z)
+	return mapClampX(x), mapClampZ(z)
+end
+
 local function nearestSand(ix, iz)
 	-- also clamps to map bounds
 	local x = math.max(math.min(ix, sizeX-halfCellSize), halfCellSize)
@@ -246,13 +263,14 @@ local function wormTargetting()
 	-- end
 	totalMovement = 0
 	sandUnits = {}
+	occupiedBoxes = {}
 	for k, uID in pairs(units) do
 		--if unit enters sand, add it to the sand unit table, if it exits, remove it
 		if not isEmergedWorm[uID] then
 			local ux, uy, uz = Spring.GetUnitBasePosition(uID)
 			local groundType, _ = Spring.GetGroundInfo(ux, uz)
 			local groundHeight = Spring.GetGroundHeight(ux, uz) 
-			if groundType == sandType and uy < groundHeight + 32 then
+			if groundType == sandType and uy < groundHeight + biteHeight then
 				local uDefID = Spring.GetUnitDefID(uID)
 				local uDef = UnitDefs[uDefID]
 				if not wormEatMex and (uDef.extractsMetal > 0) then
@@ -269,6 +287,27 @@ local function wormTargetting()
 					sandUnitPosition[uID] = {x = ux, z = uz}
 					sandUnits[uID] = true
 					num = num + 1
+					-- sort into non-grid boxes of units
+					local insideBox = false
+					for ib, box in pairs(occupiedBoxes) do
+						if ux > box.xmin and ux < box.xmax and uz > box.zmin and uz < box.zmax then
+							box.count = box.count + 1
+							insideBox = true
+							break
+						end
+					end
+					if not insideBox then
+						local box = { 
+							x = ux,
+							z = uz,
+							xmin = mapClampX(ux - halfBoxSize),
+							xmax = mapClampX(ux + halfBoxSize), 
+							zmin = mapClampZ(uz - halfBoxSize),
+							zmax = mapClampZ(uz + halfBoxSize),
+							count = 1,
+						}
+						table.insert(occupiedBoxes, box)
+					end
 					local uval = sandUnitValues[uDefID]
 	--				SendToUnsynced("passSandUnit", uID, uval)
 	--				Spring.Echo("sending", uID, uval)
@@ -296,7 +335,7 @@ local function wormTargetting()
 							bestDist[wID] = dist - uval
 							if w.fresh then
 								-- give enough time to get to the worm's first target
-								local eta = math.ceil((wormSpeed / 30) * wormChaseTimeMod * dist)
+								local eta = math.ceil((wormSpeed / 30) * dist * wormChaseTimeMod * (1+wormAnger))
 								w.endSecond = currentSecond + eta
 								-- Spring.Echo("ETA", eta)
 								w.fresh = false
@@ -304,6 +343,8 @@ local function wormTargetting()
 						end
 					end
 				end
+			else
+				sandUnitPosition[uID] = nil
 			end
 		end
 	end
@@ -409,7 +450,8 @@ local function signStampRipple(x, z, mult, lightning)
 		z = z - (z % 8)
 		local lmult
 		if lightning then lmult = mult / 65 end
-		local num = math.random(5,10)
+		local num = math.random(rippleNumMin,rippleNumMax)
+		-- local num = 8
 		for n=1,num do
 			stamp = bulgeStamp[math.random(1,#bulgeStamp)]
 			local bh = stamp.h
@@ -598,17 +640,6 @@ local function wormDirect(wID)
 --	Spring.MarkerErasePosition(tx, 100, tz)
 end
 
-local function randomSandUnit()
-	local which = math.random(numSandUnits)
-	local i = 1
-	local targetID
-	for id, b in pairs(sandUnits) do
-		if i == which then targetID = id end
-		i = i + 1
-	end
-	return targetID
-end
-
 local function passWormSign(x, z)
 	local allyList = Spring.GetAllyTeamList()
 	local y = Spring.GetGroundHeight(x, z)
@@ -630,7 +661,16 @@ local function wormSpawn()
 		w = worm[id]
 	until not w
 	if id <= maxWorms then
-		local x, y, z = randomXYZ()
+		local x, y, z
+		if #occupiedBoxes > 0 then
+			local box = occupiedBoxes[math.random(#occupiedBoxes)]
+			x, z = box.x, box.z
+			local rvx, rvz = normalizeVector( (math.random()*2)-1, (math.random()*2)-1 )
+			local away = wormSpawnDistance
+			x, z = x+(rvx*away), z+(rvz*away)
+		else
+			x, y, z = randomXYZ()
+		end
 		local spawnX, spawnZ = nearestSand(x, z)
 		local wID = id
 		worm[wID] = { x = spawnX, z = spawnZ, endSecond = math.floor(Spring.GetGameSeconds() + baseWormDuration), signSecond = Spring.GetGameSeconds() + math.random(signFreqMin, signFreqMax), lastAttackSecond = 0, vx = nil, vz = nil, tx = nil, tz = nil, hasQuaked = false, fresh = true}
@@ -679,10 +719,10 @@ function gadget:Initialize()
 	sandUnitValues = getSandUnitValues()
 	gaiaTeam = Spring.GetGaiaTeamID()
 	wormReDir = loadWormReDir()
---	createBulgeProfile(bulgeSizeV, bulgeSizeP)
 	bulgeStamp = createBulgeStamp(bulgeSize, bulgeScale)
 	rippleExpand = createRippleExpansionMap()
 	initializeRippleMap()
+	nextPotentialEvent = Spring.GetGameSeconds() + wormEventFrequency
 end
 
 function gadget:GameFrame(gf)
@@ -698,23 +738,16 @@ function gadget:GameFrame(gf)
 			local z = w.z
 			local vx = w.vx
 			local vz = w.vz
-			local nvx, nvz
-	--		if gf % evalNewVector == 0 or not wormNewVector[wID] then
-				nvx, nvz = dynamicAvoidRockVector(wID)
-				worm[wID].nvx = nvx
-				worm[wID].nvz = nvz
-	--		else
-	--			nvx = wormNewVector[wID][1]
-	--			nvz = wormNewVector[wID][2]
-	--		end
+			local nvx, nvz = dynamicAvoidRockVector(wID)
+			w.nvx = nvx
+			w.nvz = nvz
 			local xnew = math.max(math.min(x + (nvx*wormSpeed), sizeX), 0)
 			local znew = math.max(math.min(z + (nvz*wormSpeed), sizeZ), 0)
-			worm[wID].x = xnew
-			worm[wID].z = znew
-			local rad = 24
-			local hmod = 2
-			-- if it's one second before or after worm sign second, ripple sand
+			w.x = xnew
+			w.z = znew
+			local lightning = false
 			if second > w.signSecond-4 and second < w.signSecond+3 and second > w.lastAttackSecond+attackDelay then
+				-- if it's one second before or after worm sign second, ripple sand
 				if not worm[wID].hasQuaked then
 					local y = Spring.GetGroundHeight(x, z)
 					local snd = quakeSnds[math.random(1,4)]
@@ -722,13 +755,17 @@ function gadget:GameFrame(gf)
 					worm[wID].hasQuaked = true
 				end
 				local mult = 1 / (1 + math.abs(second - w.signSecond))
-				local lightning = false
 				if math.random() < 0.33 then lightning = true end
---				signStampRipple(math.max(math.min(x - (nvx*wormSpeed*64), sizeX), 0), math.max(math.min(z - (nvz*wormSpeed*40), sizeZ), 0), mult*0.5, lightning)
-				signStampRipple(xnew, znew, mult, lightning)
---				signStampRipple(math.max(math.min(x + (nvx*wormSpeed*32), sizeX), 0), math.max(math.min(z + (nvz*wormSpeed*40), sizeZ), 0), mult*0.75, lightning)
-			end	
---			SendToUnsynced("passWorm", wID, xnew, znew, vx, vz, nvx, nvz, w.tx, w.tz, w.signSecond, w.endSecond ) --uncomment this to show the worms positions, vectors, and targets real time (uses gui_worm_debug.lua)
+				signStampRipple(xnew, znew, mult, false)
+			end
+			-- always ripple sand
+			signStampRipple(xnew, znew, 0.1, lightning)
+			-- local cegx = xnew -- + math.random(50) - 26
+			-- local cegz = znew -- + math.random(50) - 26
+			local cegy = Spring.GetGroundHeight(cegx, cegz)
+			Spring.SpawnCEG("sworm_bulge",cegx,cegy,cegz,0,0,0,50,0)
+			-- Spring.SpawnCEG("sworm_dirt",cegx,cegy,cegz,0,1,0,50,0)
+			-- SendToUnsynced("passWorm", wID, xnew, znew, vx, vz, nvx, nvz, w.tx, w.tz, w.signSecond, w.endSecond ) --uncomment this to show the worms positions, vectors, and targets real time (uses gui_worm_debug.lua)
 		end
 	end
 	
@@ -751,7 +788,7 @@ function gadget:GameFrame(gf)
 		-- Spring.Echo(numSandUnits, totalSandMovement, wormAnger, maxWorms, unitsPerWormAnger, movementPerWormAnger)
 		
 		-- spawn worms
-		if numSandUnits and second >= nextPotentialEvent then
+		if numSandUnits > 0 and second >= nextPotentialEvent then
 --			Spring.Echo("potential worm event...")
 			if math.random(0, 100) < baseWormChance * (1+wormAnger) then
 				wormSpawn()

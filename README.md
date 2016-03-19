@@ -196,7 +196,7 @@ march 17, 2016:
 
 - / random unit to spawn near makes clumps of low-value units more likely to attract the worm, which is too easy to exploit. random location, and a base lifespan that's ETA to next target
 - / when worm 'dies', the next spawn event should be delayed, so that a new worm doesn't spawn instantly across the map
-- / reduce attack range to 120?
 - / unit value should matter more
 - / scrap concept of sensing range
 - / more units moving across sand should escalate everything, even in extreme cases adding more worms
+- worms get stuck on things, take too long to arrive. need a way to spawn nearish to units without prioritizing clumps. ah, a grid. or just try five random positions, use the one that's close but not too close to a sandunit
