@@ -199,4 +199,4 @@ march 17, 2016:
 - / unit value should matter more
 - / scrap concept of sensing range
 - / more units moving across sand should escalate everything, even in extreme cases adding more worms
-- worms get stuck on things, take too long to arrive. need a way to spawn nearish to units without prioritizing clumps. ah, a grid. or just try five random positions, use the one that's close but not too close to a sandunit
+- / worms get stuck on things, take too long to arrive. need a way to spawn nearish to units without prioritizing clumps. ah, a grid.
