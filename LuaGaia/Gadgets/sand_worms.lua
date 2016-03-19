@@ -112,6 +112,8 @@ local mCos = math.cos
 local mSin = math.sin
 local pi = math.pi
 local twicePi = math.pi * 2
+local halfPi = math.pi / 2
+local quarterPi = math.pi / 4
 
 
 -- functions
@@ -381,10 +383,17 @@ local function wormTargetting()
 								local testx = ux + (velx * evalFrequency)
 								local testz = uz + (velz * evalFrequency)
 								local testa = AngleXYXY(w.x, w.z, testx, testz)
-								-- local cura = AngleXYXY(w.x, w.z, ux, uz)
-								-- local adist = AngleDist(cura, testa)
-								-- local newa = AngleAdd(cura, adist*2)
-								w.tx, w.tz = CirclePos(w.x, w.z, dist, testa)
+								local cura = AngleXYXY(w.x, w.z, ux, uz)
+								local adist = AngleDist(cura, testa)
+								if math.abs(adist) > halfPi then
+									w.tx, w.tz = ux, uz
+								elseif math.abs(adist) > quarterPi then
+									local fortyFive = quarterPi
+									if adist < 0 then fortyFive = -quarterPi end
+									w.tx, w.tz = CirclePos(w.x, w.z, dist, AngleAdd(cura, fortyFive))
+								else
+									w.tx, w.tz = CirclePos(w.x, w.z, dist, testa)
+								end
 							end
 							bestDist[wID] = fardist - uval
 							-- if w.fresh then

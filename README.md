@@ -201,4 +201,6 @@ v6 -> v7
 - / more units moving across sand should escalate everything, even in extreme cases adding more worms
 - / worms get stuck on things, take too long to arrive. need a way to spawn nearish to units without prioritizing clumps. ah, a grid.
 - / keep track of units eaten, and use a belly limit, so that worms will go away and move on to new targets soon after
-- move to intercept target, not directly to target
+- / move to intercept target, not directly to target
+- / prioritize targets that are standing still or moving towards worm, i.e., can be caught
+- drop targets that are taking too long to chase
