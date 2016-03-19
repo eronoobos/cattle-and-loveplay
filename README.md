@@ -192,7 +192,7 @@ september 7, 2013:
 
 ---
 
-march 17, 2016:
+v6 -> v7
 
 - / random unit to spawn near makes clumps of low-value units more likely to attract the worm, which is too easy to exploit. random location, and a base lifespan that's ETA to next target
 - / when worm 'dies', the next spawn event should be delayed, so that a new worm doesn't spawn instantly across the map
@@ -200,3 +200,5 @@ march 17, 2016:
 - / scrap concept of sensing range
 - / more units moving across sand should escalate everything, even in extreme cases adding more worms
 - / worms get stuck on things, take too long to arrive. need a way to spawn nearish to units without prioritizing clumps. ah, a grid.
+- / keep track of units eaten, and use a belly limit, so that worms will go away and move on to new targets soon after
+- move to intercept target, not directly to target

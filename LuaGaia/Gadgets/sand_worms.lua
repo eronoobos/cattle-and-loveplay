@@ -27,10 +27,10 @@ local unitsPerWormAnger = 500 / wormAggression
 local boxSize = 1024 -- for finding occupied areas to spawn worms near
 local wormSpawnDistance = 1000 -- how far away from occupied area to spawn worm
 local biteHeight = 32 -- how high above ground in elmos will the worm target and eat units
-local wormEventFrequency = 30 -- time in seconds between potential worm event.
+local wormEventFrequency = 20 -- time in seconds between potential worm event.
 local baseWormChance = 50 -- chance out of 100 that a worm will be spawned every wormEventFrequency seconds (changed by wormAnger)
 local baseWormDuration = 60 -- how long does worm have to target initially
-local wormChaseTimeMod = 1.75 -- how much to multiply the as-the-crow-flies estimated time of arrival at target
+local wormChaseTimeMod = 2 -- how much to multiply the as-the-crow-flies estimated time of arrival at target. modified by wormAnger
 local wormNextDelay = 15 -- seconds to wait to spawn a new worm after one dies
 local distancePerValue = 2000 -- how value converts to distance, to decide between close vs valuable targets
 local mexValue = -200
@@ -51,6 +51,8 @@ local signEvalFrequency = 12 -- game frames between parts of a wormsign volley (
 
 
 -- storage variables
+local wormSpreeDuration = 10 -- how many seconds to worm duration add when target acquired first time, changes with wormAnger
+local wormBellyLimit = 3 -- changes with wormAnger
 local halfBoxSize = boxSize / 2
 local occupiedBoxes = {}
 local maxWorms = 1 -- how many worms can be in the game at once (changes with wormAnger)
@@ -102,12 +104,48 @@ local quakeSnds = { sndQuakeA, sndQuakeB, sndQuakeC, sndQuakeD }
 local lightningSnds = { sndLightningA, sndLightningB, sndLightningC, sndLightningD, sndLightningE }
 local electricSnds = { sndElectricSpark, sndElectricLadder, sndElectricFizzle }
 
+-- renamed functions
+local mAtan2 = math.atan2
+local mRandom = math.random
+local mAbs = math.abs
+local mCos = math.cos
+local mSin = math.sin
+local pi = math.pi
+local twicePi = math.pi * 2
+
 
 -- functions
 
 -- y is not random, but zero
 local function randomXYZ()
 	return math.random(sizeX), 0, math.random(sizeZ)
+end
+
+local function AngleAdd(angle1, angle2)
+  return (angle1 + angle2) % twicePi
+end
+
+local function AngleXYXY(x1, y1, x2, y2)
+  local dx = x2 - x1
+  local dy = y2 - y1
+  return mAtan2(dy, dx), dx, dy
+end
+
+local function AngleDist(angle1, angle2)
+  return ((angle1 + pi - angle2) % twicePi) - pi
+end
+
+local function CirclePos(cx, cy, dist, angle)
+  angle = angle or mRandom() * twicePi
+  local x = cx + dist * mCos(angle)
+  local y = cy + dist * mSin(angle)
+  return x, y
+end
+
+local function DistanceSq(x1, y1, x2, y2)
+  local dx = mAbs(x2 - x1)
+  local dy = mAbs(y2 - y1)
+  return (dx*dx) + (dy*dy)
 end
 
 local function loadWormReDir()
@@ -255,7 +293,7 @@ local function wormTargetting()
 	local num = 0
 	local bestDist = {}
 	for wID, w in pairs(worm) do
-		bestDist[wID] = 9999
+		bestDist[wID] = nil
 	end
 	-- for debugging
 	-- for uID, b in pairs(sandUnits) do
@@ -276,12 +314,14 @@ local function wormTargetting()
 				if not wormEatMex and (uDef.extractsMetal > 0) then
 					-- don't target mexes if mapoption says no
 				else
+					local dx, dz = 0, 0
 					if sandUnitPosition[uID] then
 						-- add how much the unit has moved since last evaluation to total movement sum
-						local dx = math.abs(sandUnitPosition[uID].x - ux)
-						local dz = math.abs(sandUnitPosition[uID].z - uz)
-						if dx > 0 or dz > 0 then
-							totalMovement = totalMovement + dx + dz + uDef.metalCost
+						dx = ux - sandUnitPosition[uID].x
+						dz = uz - sandUnitPosition[uID].z
+						local adx, adz = math.abs(dx), math.abs(dz)
+						if adx > 0 or adz > 0 then
+							totalMovement = totalMovement + adx + adz + uDef.metalCost
 						end
 					end
 					sandUnitPosition[uID] = {x = ux, z = uz}
@@ -317,11 +357,20 @@ local function wormTargetting()
 						local distx = math.abs(ux - x)
 						local distz = math.abs(uz - z)
 						local dist = math.sqrt((distx*distx) + (distz*distz))
+						local velx, vely, velz, velLength = Spring.GetUnitVelocity(uID)
+						-- Spring.Echo(velx, vely, velz, velLength)
+						local pvelx = dx / evalFrequency
+						local pvelz = dz / evalFrequency
+						velx = (velx + pvelx) / 2
+						velz = (velz + pvelz) / 2
+						local farx = ux + (velx * (dist/wormSpeed))
+						local farz = uz + (velz * (dist/wormSpeed))
+						local fardist = math.sqrt(DistanceSq(w.x, w.z, farx, farz))
 	--					Spring.Echo(wID, "sensed unit", uID, "at", ux, uz)
-						if dist - uval < bestDist[wID] then
+						if fardist - uval < (bestDist[wID] or 999999) then
 							if uval < 0 then
 								-- for negative values (mexes and hovers)
-								-- target badly, like a wandering radar blip
+								-- wander around randomly
 								local j = -uval
 								local jx = (math.random() * j * 2) - j
 								local jz = (math.random() * j * 2) - j
@@ -329,17 +378,24 @@ local function wormTargetting()
 								worm[wID].tx = tx
 								worm[wID].tz = tz
 							else
-								worm[wID].tx = ux
-								worm[wID].tz = uz
+								local testx = ux + (velx * evalFrequency)
+								local testz = uz + (velz * evalFrequency)
+								local testa = AngleXYXY(w.x, w.z, testx, testz)
+								-- local cura = AngleXYXY(w.x, w.z, ux, uz)
+								-- local adist = AngleDist(cura, testa)
+								-- local newa = AngleAdd(cura, adist*2)
+								w.tx, w.tz = CirclePos(w.x, w.z, dist, testa)
 							end
-							bestDist[wID] = dist - uval
-							if w.fresh then
-								-- give enough time to get to the worm's first target
-								local eta = math.ceil((wormSpeed / 30) * dist * wormChaseTimeMod * (1+wormAnger))
+							bestDist[wID] = fardist - uval
+							-- if w.fresh then
+							if w.targetUnitID ~= uID then
+								-- give enough time to get to the worm's new target
+								local eta = math.ceil((wormSpeed / 30) * fardist * wormChaseTimeMod)
 								w.endSecond = currentSecond + eta
 								-- Spring.Echo("ETA", eta)
 								w.fresh = false
 							end
+							w.targetUnitID = uID
 						end
 					end
 				end
@@ -673,7 +729,7 @@ local function wormSpawn()
 		end
 		local spawnX, spawnZ = nearestSand(x, z)
 		local wID = id
-		worm[wID] = { x = spawnX, z = spawnZ, endSecond = math.floor(Spring.GetGameSeconds() + baseWormDuration), signSecond = Spring.GetGameSeconds() + math.random(signFreqMin, signFreqMax), lastAttackSecond = 0, vx = nil, vz = nil, tx = nil, tz = nil, hasQuaked = false, fresh = true}
+		worm[wID] = { x = spawnX, z = spawnZ, endSecond = math.floor(Spring.GetGameSeconds() + baseWormDuration), signSecond = Spring.GetGameSeconds() + math.random(signFreqMin, signFreqMax), lastAttackSecond = 0, vx = nil, vz = nil, tx = nil, tz = nil, hasQuaked = false, fresh = true, bellyCount = 0 }
 		wormBigSign(wID)
 		passWormSign(spawnX, spawnZ)
 	end
@@ -756,16 +812,16 @@ function gadget:GameFrame(gf)
 				end
 				local mult = 1 / (1 + math.abs(second - w.signSecond))
 				if math.random() < 0.33 then lightning = true end
-				signStampRipple(xnew, znew, mult, false)
+				signStampRipple(xnew, znew, mult, lightning)
 			end
 			-- always ripple sand
-			signStampRipple(xnew, znew, 0.1, lightning)
+			signStampRipple(xnew, znew, 0.25, false)
 			-- local cegx = xnew -- + math.random(50) - 26
 			-- local cegz = znew -- + math.random(50) - 26
-			local cegy = Spring.GetGroundHeight(cegx, cegz)
-			Spring.SpawnCEG("sworm_bulge",cegx,cegy,cegz,0,0,0,50,0)
+			-- local cegy = Spring.GetGroundHeight(cegx, cegz)
+			-- Spring.SpawnCEG("sworm_bulge",cegx,cegy,cegz,0,0,0,50,0)
 			-- Spring.SpawnCEG("sworm_dirt",cegx,cegy,cegz,0,1,0,50,0)
-			-- SendToUnsynced("passWorm", wID, xnew, znew, vx, vz, nvx, nvz, w.tx, w.tz, w.signSecond, w.endSecond ) --uncomment this to show the worms positions, vectors, and targets real time (uses gui_worm_debug.lua)
+			SendToUnsynced("passWorm", wID, xnew, znew, vx, vz, nvx, nvz, w.tx, w.tz, w.signSecond, w.endSecond ) --uncomment this to show the worms positions, vectors, and targets real time (uses gui_worm_debug.lua)
 		end
 	end
 	
@@ -785,7 +841,9 @@ function gadget:GameFrame(gf)
 		-- calculate worm anger
 		wormAnger = ((numSandUnits + 1) / unitsPerWormAnger) + ((totalSandMovement + 1) / movementPerWormAnger)
 		maxWorms = math.ceil(wormAnger)
-		-- Spring.Echo(numSandUnits, totalSandMovement, wormAnger, maxWorms, unitsPerWormAnger, movementPerWormAnger)
+		wormBellyLimit = math.ceil(wormAnger * 12)
+		wormSpreeDuration = math.ceil(wormAnger * 60)
+		-- Spring.Echo(maxWorms, wormBellyLimit, wormSpreeDuration, wormAnger, numSandUnits, totalSandMovement, unitsPerWormAnger, movementPerWormAnger)
 		
 		-- spawn worms
 		if numSandUnits > 0 and second >= nextPotentialEvent then
@@ -834,8 +892,12 @@ function gadget:GameFrame(gf)
 				end
 				if bestID and not alreadyAttacked[bestID] then
 					wormAttack(bestID)
-					worm[wID].lastAttackSecond = second
+					w.lastAttackSecond = second
 					alreadyAttacked[bestID] = true
+					w.bellyCount = w.bellyCount + 1
+					if w.bellyCount > wormBellyLimit then
+						w.endSecond = second + attackDelay - 1
+					end
 				end
 			end
 		end
