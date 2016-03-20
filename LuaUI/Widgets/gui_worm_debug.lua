@@ -10,10 +10,9 @@ function widget:GetInfo()
 	}
 end
 
-local evalFrequency = 200
-local wormRange = 150 -- range within which worm will attack
+local evalFrequency = 150
+local wormRange = 65 -- range within which worm will attack
 local wormSpeed = 1.0 -- how much the worm's vector is multiplied by to produce a position each game frame
-local wormSensingRange = 1500 -- the range within which a unit will add to a worm's "anger" (i.e. will keep the worm from leaving)
 
 local areWorms = true
 local worm
@@ -29,10 +28,17 @@ function widget:Initialize()
 	else
 		worm = {}
 		uvals = {}
+		widgetHandler:RegisterGlobal("passWormInit", passWormInit) -- get config data from gadget
 		widgetHandler:RegisterGlobal("passWorm", passWorm) --so that widget can receive worm information from the gadget
 		widgetHandler:RegisterGlobal("passSandUnit", passSandUnit)
 	end
 end 
+
+function passWormInit(evalFreq, speed, range)
+	evalFrequency = evalFreq
+	wormSpeed = speed
+	wormRange = range
+end
 
 function passWorm(wID, x, z, vx, vz, nvx, nvz, tx, tz, signSecond, endSecond)
 	if x then
@@ -78,7 +84,6 @@ function widget:DrawWorld()
 			gl.DrawGroundCircle(w.x, y, w.z, wormRange, 16)
 			gl.Color(1, 0.5, 0, 1)
 			gl.LineWidth(2)
-			gl.DrawGroundCircle(w.x, y, w.z, wormSensingRange, 16)
 			gl.Color(1, 0.9, 0.1, 1)
 			gl.DrawGroundCircle(w.x, y, w.z, 32, 16)
 			if w.vx then

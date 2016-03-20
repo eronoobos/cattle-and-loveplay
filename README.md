@@ -203,4 +203,4 @@ v6 -> v7
 - / keep track of units eaten, and use a belly limit, so that worms will go away and move on to new targets soon after
 - / move to intercept target, not directly to target
 - / prioritize targets that are standing still or moving towards worm, i.e., can be caught
-- drop targets that are taking too long to chase
+- / smaller attack range, more frequent checks for units in range

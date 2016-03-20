@@ -48,7 +48,7 @@ local attackDelay = 12 -- delay between worm attacks
 local cellSize = 64 -- for wormReDir
 local evalFrequency = 150 -- game frames between evaluation of units on sand
 local signEvalFrequency = 12 -- game frames between parts of a wormsign volley (lower value means more lightning strikes per sign)
-
+local attackEvalFrequency = 30 -- game frames between attacking units in range of worm under sand
 
 -- storage variables
 local wormSpreeDuration = 10 -- how many seconds to worm duration add when target acquired first time, changes with wormAnger
@@ -134,7 +134,15 @@ local function AngleXYXY(x1, y1, x2, y2)
 end
 
 local function AngleDist(angle1, angle2)
-  return ((angle1 + pi - angle2) % twicePi) - pi
+  -- return ((angle1 + pi - angle2) % twicePi) - pi
+  -- angle = 180 - abs(abs(a1 - a2) - 180); 
+  local a = angle2 - angle1
+  if a > pi then
+  	a = a - twicePi
+  elseif a < -pi then
+  	a = a + twicePi
+  end
+  return a
 end
 
 local function CirclePos(cx, cy, dist, angle)
@@ -365,41 +373,46 @@ local function wormTargetting()
 						local pvelz = dz / evalFrequency
 						velx = (velx + pvelx) / 2
 						velz = (velz + pvelz) / 2
-						local farx = ux + (velx * (dist/wormSpeed))
-						local farz = uz + (velz * (dist/wormSpeed))
+						local velmult = dist/wormSpeed
+						local farx = ux + (velx * velmult)
+						local farz = uz + (velz * velmult)
 						local fardist = math.sqrt(DistanceSq(w.x, w.z, farx, farz))
 	--					Spring.Echo(wID, "sensed unit", uID, "at", ux, uz)
 						if fardist - uval < (bestDist[wID] or 999999) then
 							if uval < 0 then
 								-- for negative values (mexes and hovers)
-								-- wander around randomly
+								-- target badly, like a radar blip
 								local j = -uval
 								local jx = (math.random() * j * 2) - j
 								local jz = (math.random() * j * 2) - j
-								local tx, tz = nearestSand(worm[wID].tx + jx, worm[wID].tz + jz)
-								worm[wID].tx = tx
-								worm[wID].tz = tz
+								w.tx, w.tz = nearestSand(ux + jx, uz + jz)
 							else
-								local testx = ux + (velx * evalFrequency)
-								local testz = uz + (velz * evalFrequency)
+								local veltestmult = velmult / 1.5
+								local testx = ux + (velx * veltestmult)
+								local testz = uz + (velz * veltestmult)
 								local testa = AngleXYXY(w.x, w.z, testx, testz)
 								local cura = AngleXYXY(w.x, w.z, ux, uz)
 								local adist = AngleDist(cura, testa)
+								-- Spring.Echo(cura, testa, adist)
 								if math.abs(adist) > halfPi then
 									w.tx, w.tz = ux, uz
+									-- Spring.Echo("adist above halfpi, using ux, uz")
 								elseif math.abs(adist) > quarterPi then
 									local fortyFive = quarterPi
 									if adist < 0 then fortyFive = -quarterPi end
+									local newa = AngleAdd(cura, fortyFive)
 									w.tx, w.tz = CirclePos(w.x, w.z, dist, AngleAdd(cura, fortyFive))
+									-- Spring.Echo("adist above quarterpi", fortyFive, newa)
 								else
 									w.tx, w.tz = CirclePos(w.x, w.z, dist, testa)
+									-- Spring.Echo("adist below quarterpi, using testa")
 								end
 							end
 							bestDist[wID] = fardist - uval
 							-- if w.fresh then
 							if w.targetUnitID ~= uID then
 								-- give enough time to get to the worm's new target
-								local eta = math.ceil((wormSpeed / 30) * fardist * wormChaseTimeMod)
+								local eta = math.ceil((wormSpeed / 30) * fardist * wormChaseTimeMod) + 20
 								w.endSecond = currentSecond + eta
 								-- Spring.Echo("ETA", eta)
 								w.fresh = false
@@ -773,8 +786,10 @@ function gadget:Initialize()
 		if mapOptions.sworm_aggression then wormAggression = tonumber(mapOptions.sworm_aggression) end
 		movementPerWormAnger = 100000 / wormAggression
 		if mapOptions.sworm_worm_speed then wormSpeed = tonumber(mapOptions.sworm_worm_speed) end
-		wormRange = ((wormSpeed * evalFrequency) / 2) + 50
+		wormRange = ((wormSpeed * attackEvalFrequency) / 2) + 50
 		if mapOptions.sworm_eat_mex == "1" then wormEatMex = true end
+		Spring.Echo("worm range", wormRange)
+		SendToUnsynced("passWormInit", evalFrequency, wormSpeed, wormRange) -- uncomment for showing worm positions with debug widget
 	end
 	if not areWorms then
 		Spring.Echo("Sand worms are not enabled. Sand worm gadget disabled.")
@@ -850,7 +865,7 @@ function gadget:GameFrame(gf)
 		-- calculate worm anger
 		wormAnger = ((numSandUnits + 1) / unitsPerWormAnger) + ((totalSandMovement + 1) / movementPerWormAnger)
 		maxWorms = math.ceil(wormAnger)
-		wormBellyLimit = math.ceil(wormAnger * 12)
+		wormBellyLimit = math.ceil(wormAnger * 11) + 1
 		wormSpreeDuration = math.ceil(wormAnger * 60)
 		-- Spring.Echo(maxWorms, wormBellyLimit, wormSpreeDuration, wormAnger, numSandUnits, totalSandMovement, unitsPerWormAnger, movementPerWormAnger)
 		
@@ -874,7 +889,9 @@ function gadget:GameFrame(gf)
 			end
 			wormDirect(wID)
 		end
+	end
 
+	if gf % attackEvalFrequency == 0 then
 		-- do worm attacks on units that are within range
 		local alreadyAttacked = {}
 		for wID, w in pairs(worm) do
@@ -883,7 +900,7 @@ function gadget:GameFrame(gf)
 				local wz = w.z
 				local wy = Spring.GetGroundHeight(wx, wz)
 				local unitsNearWorm = Spring.GetUnitsInSphere(wx, wy, wz, wormRange)
-				local bestVal = -9999
+				local bestVal = -99999
 				local bestID
 				for k, uID in pairs(unitsNearWorm) do
 					if not isEmergedWorm[uID] then
@@ -904,15 +921,17 @@ function gadget:GameFrame(gf)
 					w.lastAttackSecond = second
 					alreadyAttacked[bestID] = true
 					w.bellyCount = w.bellyCount + 1
-					if w.bellyCount > wormBellyLimit then
-						w.endSecond = second + attackDelay - 1
+					if w.bellyCount >= wormBellyLimit then
+						w.endSecond = second + 1
 					end
+					Spring.Echo(w.bellyCount, wormBellyLimit, w.endSecond)
 				end
 			end
 		end
+	end
 	
 	-- do worm sign lightning and pass wormsign markers to widget
-	elseif gf % signEvalFrequency == 0 then
+	if gf % signEvalFrequency == 0 then
 --		Spring.Echo("doing wormsigns at", secondInt, second)
 		for wID, w in pairs(worm) do
 			local timeToSign = w.signSecond
@@ -957,6 +976,12 @@ end
 -- unsynced
 if not gadgetHandler:IsSyncedCode() then
 
+	local function initToLuaUI(_, evalFreq, speed, range)
+	  if (Script.LuaUI('passWormInit')) then
+		Script.LuaUI.passWormInit(evalFreq, speed, range)
+	  end
+	end
+
 	local function wormToLuaUI(_, wID, x, z, vx, vz, nvx, nvz, tx, tz, signSecond, endSecond)
 	  if (Script.LuaUI('passWorm')) then
 		Script.LuaUI.passWorm(wID, x, z, vx, vz, nvx, nvz, tx, tz, signSecond, endSecond)
@@ -985,6 +1010,7 @@ if not gadgetHandler:IsSyncedCode() then
 	end
 
 	function gadget:Initialize()
+	  gadgetHandler:AddSyncAction('passWormInit', initToLuaUI)
 	  gadgetHandler:AddSyncAction('passWorm', wormToLuaUI)
 	  gadgetHandler:AddSyncAction('passSandUnit', sandUnitToLuaUI)
 	  gadgetHandler:AddSyncAction('passSign', signToLuaUI)
