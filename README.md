@@ -204,3 +204,10 @@ v6 -> v7
 - / move to intercept target, not directly to target
 - / prioritize targets that are standing still or moving towards worm, i.e., can be caught
 - / smaller attack range, more frequent checks for units in range
+- / sounds for ground lightning: quiet lightning
+- / sounds for air lightning: all of the long thunder rumbles
+- / use sounds.lua
+- / convert tdf cegs to lua
+- / convert tga bitmaps to png
+- add dust cegs and more violent ground ripples when worm emerges to attack
+- optimize all Spring and math functions

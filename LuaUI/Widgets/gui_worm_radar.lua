@@ -12,7 +12,7 @@ end
 
 -- config
 local areWorms = true
-local signDuration = 4 -- how long in seconds each sign lasts on screen
+local signDuration = 5 -- how long in seconds each sign lasts on screen
 local flashDuration = 1/6 -- seconds per flash
 local hornPeriod = 0.5 -- seconds per alarm horn
 local hornNumber = 3 -- number of horns per alarm
@@ -59,16 +59,6 @@ local lastHorn = 0
 -- local functions
 
 function passSign(x, y, z, los)
---	Spring.MarkerAddPoint(x, y, z, "Worm Sign")
---	Spring.MarkerErasePosition(x, y, z)
---[[
-	if los then
-		local inView = Spring.IsSphereInView(x, y, z)
-		if not inView then
-			los = false
-		end
-	end
-]]--
 	-- finding an empty sign array id
 	local s = { 1 }
 	local id = 0
@@ -201,11 +191,11 @@ function widget:DrawScreen()
 			gl.TexRect(x1, y1, x2, y2)
 		end
 		-- play one alarm horn if new and more than hornPeriod seconds later
-		if s.new and (second > lastHorn + hornPeriod) and (hornCount < hornNumber)  then
-			Spring.PlaySoundFile(sndSignAlarm, 0.1)
-			lastHorn = second
-			hornCount = hornCount + 1
-		end
+		-- if s.new and (second > lastHorn + hornPeriod) and (hornCount < hornNumber)  then
+		-- 	Spring.PlaySoundFile(sndSignAlarm, 0.1)
+		-- 	lastHorn = second
+		-- 	hornCount = hornCount + 1
+		-- end
 		-- remove sign if it's above duration
 		if second > s.d then
 			sign[id] = nil
