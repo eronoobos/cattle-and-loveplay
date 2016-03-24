@@ -94,41 +94,34 @@ Turn( foodmagnet,z_axis,math.rad(0),0)
 end
 
 function closeMouth()
-Turn(sWormMout0,z_axis,math.rad(50),10)
-Turn(sWormMout2,z_axis,math.rad(-50),10)
-Turn(sWormMout1,x_axis,math.rad(50),10)
-Turn(sWormMout3,x_axis,math.rad(-50),10)
+Turn(sWormMout0,z_axis,math.rad(0),10)
+Turn(sWormMout2,z_axis,math.rad(0),10)
+Turn(sWormMout1,x_axis,math.rad(0),10)
+Turn(sWormMout3,x_axis,math.rad(0),10)
 end
 
 function closeMouthHalf()
-Turn(sWormMout0,z_axis,math.rad(25),5)
-Turn(sWormMout2,z_axis,math.rad(-25),5)
-Turn(sWormMout1,x_axis,math.rad(25),5)
-Turn(sWormMout3,x_axis,math.rad(-25),5)
+Turn(sWormMout0,z_axis,math.rad(-20),5)
+Turn(sWormMout2,z_axis,math.rad(20),5)
+Turn(sWormMout1,x_axis,math.rad(-20),5)
+Turn(sWormMout3,x_axis,math.rad(20),5)
 end
 
 function openMouthSlow()
-Turn(sWormMout0,z_axis,math.rad(0),0.12)
-Turn(sWormMout2,z_axis,math.rad(0),0.12)
-Turn(sWormMout1,x_axis,math.rad(0),0.12)
-Turn(sWormMout3,x_axis,math.rad(0),0.12)
+Turn(sWormMout0,z_axis,math.rad(-55),0.2)
+Turn(sWormMout2,z_axis,math.rad(55),0.2)
+Turn(sWormMout1,x_axis,math.rad(-55),0.2)
+Turn(sWormMout3,x_axis,math.rad(55),0.2)
 end
 
 function openMouth()
-Turn(sWormMout0,z_axis,math.rad(0),0.5)
-Turn(sWormMout2,z_axis,math.rad(0),0.5)
-Turn(sWormMout1,x_axis,math.rad(0),0.5)
-Turn(sWormMout3,x_axis,math.rad(0),0.5)
+Turn(sWormMout0,z_axis,math.rad(-55),0.5)
+Turn(sWormMout2,z_axis,math.rad(55),0.5)
+Turn(sWormMout1,x_axis,math.rad(-55),0.5)
+Turn(sWormMout3,x_axis,math.rad(55),0.5)
 end
 
-local function WaitForMouth()
-	WaitForTurn(sWormMout0, z_axis)
-	WaitForTurn(sWormMout2, z_axis)
-	WaitForTurn(sWormMout1, x_axis)
-	WaitForTurn(sWormMout3, x_axis)
-end
-
-local function MuchDirt(unitx, unity, unitz, dirtnum, sleepbetween, randradius)
+function MuchDirt(unitx, unity, unitz, dirtnum, sleepbetween, randradius)
 	randradius = randradius or 25
 	for i=1,dirtnum do
 		randX=math.random(-randradius,randradius)
@@ -161,7 +154,7 @@ Spring.MoveCtrl.SetGroundOffset(idUnitToBeSwallowed, 80)
 -- AttachUnit(foodmagnet, idUnitToBeSwallowed)
 MuchDirt(unitx, unity, unitz, 11, 100)
 Spring.Echo("attached", Spring.GetUnitBasePosition(idUnitToBeSwallowed))
-Move(center,y_axis,80,16)-- the whole thing is wheighting tons of tons, so propelling itself out of the sand, slows it down
+Move(center,y_axis,150,30)-- the whole thing is wheighting tons of tons, so propelling itself out of the sand, slows it down
 
 MuchDirt(unitx, unity, unitz, 11, 100)
 
@@ -177,30 +170,27 @@ local unitHealth, unitMaxHealth = Spring.GetUnitHealth(idUnitToBeSwallowed)
 Spring.Echo(unitMass, unitHealth, unitMaxHealth)
 
 Move(foodmagnet,y_axis,-50 - unitHeight, 11) -- expecting unit to be attached to foodmagnet from this point towards
-Move(center,y_axis,5, 11)
+Move(center,y_axis,75, 11)
 MuchDirt(unitx, unity, unitz, 10, 10)
 WaitForMove(center,y_axis)
--- WaitForMouth()
+WaitForTurn(sWormMout0, z_axis)
 closeMouthHalf()
 MuchDirt(unitx, unity, unitz, 6)
 -- Spring.MoveCtrl.SetVelocity(idUnitToBeSwallowed, 0, 2, 0)
 -- Spring.MoveCtrl.SetRotationVelocity(idUnitToBeSwallowed, math.random(2)-1, math.random(2)-1, math.random(2)-1)
--- WaitForMouth()
-Sleep(50)
 Spring.MoveCtrl.Disable(idUnitToBeSwallowed)
 Spring.AddUnitImpulse(idUnitToBeSwallowed, 0, 6, 0)
 Spring.SetUnitHealth(idUnitToBeSwallowed, unitMaxHealth*0.1)
 Spring.SetUnitRotation(idUnitToBeSwallowed, math.random(30)-15, math.random(30)-15, math.random(30)-15)
-openMouth()
-Sleep(4000)
--- Spring.DestroyUnit(idUnitToBeSwallowed)
+WaitForTurn(sWormMout0, z_axis)
+openMouthSlow()
 MuchDirt(unitx, unity, unitz, 6)
--- WaitForMouth()
+WaitForTurn(sWormMout0, z_axis)
 MuchDirt(unitx, unity, unitz, 5)
 closeMouth()
 Spring.DestroyUnit (idUnitToBeSwallowed, true)
-Move(center,y_axis,-40, 7)
--- WaitForMouth()
+Move(center,y_axis,0, 7)
+WaitForTurn(sWormMout0, z_axis)
 
 -- if (Spring.ValidUnitID (idUnitToBeSwallowed)) then -- this assures, that the unit in the mouth is alive until the very last moment
 		-- Spring.Echo("death", Spring.GetUnitBasePosition(idUnitToBeSwallowed))

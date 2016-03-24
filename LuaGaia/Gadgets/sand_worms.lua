@@ -815,7 +815,7 @@ function gadget:GameFrame(gf)
 			rippleMult = 1 / (1 + math.abs(second - w.signSecond))
 		elseif w.vx and second > w.lastAttackSecond+attackDelay then
 			-- when moving, always ripple sand a little with occasional ground lightning
-			lightning = mRandom() < 0.15
+			lightning = mRandom() < 0.3
 			rippleMult = 0.2
 		end
 		if rippleMult then

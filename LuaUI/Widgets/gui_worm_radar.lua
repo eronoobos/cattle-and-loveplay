@@ -148,7 +148,7 @@ function widget:Initialize()
 		widgetHandler:RemoveWidget()
 	else
 		widgetHandler:RegisterGlobal("passSign", passSign) --so that widget can receive worm information from the gadget
-		Spring.AddUnitIcon('sworm', 'icons/sworm.tga', 3, 1.0)
+		Spring.AddUnitIcon('sworm', 'icons/sworm.png', 3, 1.0)
 		Spring.SetUnitDefIcon(UnitDefNames.sworm.id, 'sworm')
 	end
 end 

@@ -108,7 +108,7 @@ local mapinfo = {
 
 	splats = {
 		-- flat, depression, cliff, metal
-		texScales = {0.009, 0.03, 0.015, 0.007},
+		texScales = {0.015, 0.03, 0.015, 0.007},
 		texMults  = {0.3, 0.6, 0.25, 0.5},
 	},
 
