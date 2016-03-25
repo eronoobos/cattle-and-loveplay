@@ -209,8 +209,13 @@ v6 -> v7
 - / use sounds.lua
 - / convert tdf cegs to lua
 - / convert tga bitmaps to png
-- optimize all Spring and math functions
+- / if it hasn't eaten anything in say 90 seconds, worm should "die". targetting time and eta should be irrelevant
+- / more frequent worm spawn events with more worm anger
+- / maximum 3 worms
+- prevent worms from eating commanders?
 - use native radar instead of widget radar? by making an invisible unit move around the map as the underground worm
-- rebalance sound volumes in sounds.lua
+- rebalance sound volumes in playback
+- use three-lipped or four-lipped worm?
 - create three different worm sizes, the current being the smallest. worm spawns large enough to eat the largest unit on the sand
+- optimize all Spring and math functions
 - delete unecessary sounds and images

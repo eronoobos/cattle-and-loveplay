@@ -27,9 +27,8 @@ local unitsPerWormAnger = 500 / wormAggression
 local boxSize = 1024 -- for finding occupied areas to spawn worms near
 local wormSpawnDistance = 1000 -- how far away from occupied area to spawn worm
 local biteHeight = 32 -- how high above ground in elmos will the worm target and eat units
-local wormEventFrequency = 20 -- time in seconds between potential worm event.
 local baseWormChance = 40 -- chance out of 100 that a worm will be spawned every wormEventFrequency seconds (changed by wormAnger)
-local baseWormDuration = 60 -- how long does worm have to target initially
+local baseWormDuration = 90 -- how long will a worm chase something to eat before giving up
 local wormChaseTimeMod = 2 -- how much to multiply the as-the-crow-flies estimated time of arrival at target. modified by wormAnger
 local distancePerValue = 2000 -- how value converts to distance, to decide between close vs valuable targets
 local mexValue = -200 -- negative value = inaccuracy of targetting
@@ -50,7 +49,7 @@ local signEvalFrequency = 12 -- game frames between parts of a wormsign volley (
 local attackEvalFrequency = 30 -- game frames between attacking units in range of worm under sand
 
 -- storage variables
-local wormSpreeDuration = 10 -- how many seconds to worm duration add when target acquired first time, changes with wormAnger
+local wormEventFrequency = 55 -- time in seconds between potential worm event. changes with worm anger.
 local wormBellyLimit = 3 -- changes with wormAnger
 local halfBoxSize = boxSize / 2
 local occupiedBoxes = {}
@@ -394,8 +393,8 @@ local function wormTargetting()
 							-- if w.fresh then
 							if w.targetUnitID ~= uID then
 								-- give enough time to get to the worm's new target
-								local eta = math.ceil((wormSpeed / 30) * fardist * wormChaseTimeMod) + 20
-								w.endSecond = currentSecond + eta
+								-- local eta = math.ceil((wormSpeed / 30) * fardist * wormChaseTimeMod) + 20
+								-- w.endSecond = currentSecond + eta
 								-- Spring.Echo("ETA", eta)
 								w.fresh = false
 							end
@@ -428,10 +427,10 @@ local function signLightning(x, y, z)
 	Spring.SpawnCEG("WORMSIGN_FLASH",x,y,z,0,1,0,2,0)
 end
 
-local function signArcLightning(x, y, z, arcHeight, squishDiv, segLength, flashCeg)
+local function signArcLightning(x, y, z, arcLength, lengthPerHeight, segLength, flashCeg)
 	segLength = segLength or 24
 	flashCeg = flashCeg or "WORMSIGN_FLASH_SMALL"
-	local sub = math.sqrt(arcHeight)
+	local sub = math.sqrt(arcLength)
 	local div = sub / 2
 	local xrand = (2*mRandom()) - 1
 	local zrand = (2*mRandom()) - 1
@@ -439,9 +438,9 @@ local function signArcLightning(x, y, z, arcHeight, squishDiv, segLength, flashC
 	local lz = 0
 	local ly = 0
 	local i = 0
-	local gh = y+arcHeight
+	local gh = y+arcLength
 	repeat
-		ly = ( arcHeight-(((i/div)-sub)^2) ) / squishDiv
+		ly = ( arcLength-(((i/div)-sub)^2) ) / lengthPerHeight
 		local cx = x+lx
 		local cy = y+ly
 		local cz = z+lz
@@ -449,10 +448,11 @@ local function signArcLightning(x, y, z, arcHeight, squishDiv, segLength, flashC
 		if i % segLength == 0 then
 			xrand = (2*mRandom()) - 1
 			zrand = (2*mRandom()) - 1
+			gh = Spring.GetGroundHeight(cx,cz)
 		end
-		if i % 8 == 0 then
-			gh = Spring.GetGroundHeight(x+lx,z+lz)
-		end
+		-- if i % 8 == 0 then
+			-- gh = Spring.GetGroundHeight(x+lx,z+lz)
+		-- end
 		lx = lx + xrand
 		lz = lz + zrand
 		i = i + 1
@@ -466,7 +466,7 @@ local function wormBigSign(wID)
 	local sz = worm[wID].z
 	local sy = Spring.GetGroundHeight(sx, sz)
 	signLightning(sx, sy, sz)
-	-- signArcLightning( sx, sy, sz, mRandom(1500,2000), mRandom(20,30), 200, "WORMSIGN_FLASH" )
+	-- signArcLightning( sx, sy, sz, mRandom(1500,2000), mRandom(5,10), 100, "WORMSIGN_FLASH" )
 	local snd = thunderSnds[mRandom(#thunderSnds)]
 	Spring.PlaySoundFile(snd,1.0,sx,sy,sz)
 end
@@ -480,7 +480,7 @@ local function wormMediumSign(wID, randRadius)
 	local sy = Spring.GetGroundHeight(sx, sz)
 	local num = mRandom(1,2)
 	for n=1,num do
-		signArcLightning( sx, sy, sz, mRandom(96,256), mRandom(5,12), 48 )
+		signArcLightning( sx, sy, sz, mRandom(96,256), mRandom(4,10), 32 )
 	end
 	local snd = lightningSnds[mRandom(#lightningSnds)]
 	Spring.PlaySoundFile(snd,0.33,sx,sy,sz)
@@ -488,7 +488,7 @@ end
 
 local function wormLittleSign(wID, sx, sy, sz)
 	local w = worm[wID]
-	if not w then return end
+	if not w and not sx then return end
 	sx = sx or w.x
 	sz = sz or w.z
 	sy = sy or Spring.GetGroundHeight(sx, sz)
@@ -513,10 +513,18 @@ local function addRipple(x, z, hmod)
 	if hmod > 0.1 then
 		local rx = math.floor(x / 8)
 		local rz = math.floor(z / 8)
-		x = rx * 8
-		z = rz * 8
+		if not rippleMap[rx] then
+			-- Spring.Echo("bad rx in ripplemap", rx)
+			return
+		end
+		if not rippleMap[rx][rz] then
+			-- Spring.Echo("bad rz in ripplemap", rz)
+			return
+		end
 		if rippleMap[rx][rz] == 0 then table.insert(rippled, {rx, rz}) end
 		rippleMap[rx][rz] = rippleMap[rx][rz] + hmod
+		x = rx * 8
+		z = rz * 8
 		Spring.AdjustHeightMap(x, z, x+8, z+8, hmod)
 	end
 end
@@ -865,12 +873,19 @@ function gadget:GameFrame(gf)
 		-- do targetting of units on sand
 		numSandUnits, totalSandMovement = wormTargetting()
 
-		-- calculate worm anger
+		-- calculate worm anger & dependent variables
 		wormAnger = ((numSandUnits + 1) / unitsPerWormAnger) + ((totalSandMovement + 1) / movementPerWormAnger)
-		maxWorms = math.ceil(wormAnger)
-		wormBellyLimit = math.ceil(wormAnger * 11) + 1
-		wormSpreeDuration = math.ceil(wormAnger * 60)
-		-- Spring.Echo(maxWorms, wormBellyLimit, wormSpreeDuration, wormAnger, numSandUnits, totalSandMovement, unitsPerWormAnger, movementPerWormAnger)
+		maxWorms = math.min(3, math.ceil(wormAnger))
+		wormBellyLimit = math.min(9, math.ceil(wormAnger * 6) + 1)
+		-- wormEventFrequency = 60 - (wormAnger * 45)
+		-- wormEventFrequency = 8 / wormAnger
+		if wormAnger > 2 then
+			wormEventFrequency = 5
+		else
+			wormEventFrequency = 5 + (3.5 * ((wormAnger - 2) ^ 4))
+		end
+		wormEventFrequency = math.min(60, math.max(5, math.ceil(wormEventFrequency)))
+		Spring.Echo(maxWorms, wormBellyLimit, wormEventFrequency, wormAnger, numSandUnits, totalSandMovement, unitsPerWormAnger, movementPerWormAnger)
 		
 		-- spawn worms
 		if numSandUnits > 0 and second >= nextPotentialEvent then
@@ -925,9 +940,6 @@ function gadget:GameFrame(gf)
 					w.lastAttackSecond = second
 					alreadyAttacked[bestID] = true
 					w.bellyCount = w.bellyCount + 1
-					if w.bellyCount >= wormBellyLimit then
-						w.endSecond = second + 1
-					end
 					-- Spring.Echo(w.bellyCount, wormBellyLimit, w.endSecond)
 				end
 			end
@@ -969,12 +981,21 @@ function gadget:UnitDestroyed(unitID, unitDefID, teamID, attackerID, attackerDef
 --		SendToUnsynced("passSandUnit", uID, nil)
 	end
 	
-	-- remove from emerged worms to clear table and allow worm to attack again
-	if isEmergedWorm[unitID] then
-		local wID = isEmergedWorm[unitID]
+	-- remove from emerged worms to allow worm to attack again
+	local wID = isEmergedWorm[unitID]
+	if wID then
 		local w = worm[wID]
-		if w then w.emergedID = nil end
 		isEmergedWorm[unitID] = nil
+		if w then
+			w.emergedID = nil
+			if w.bellyCount >= wormBellyLimit then
+				-- worms that have eaten too much must take some time to rest & digest
+				wormDie(wID)
+			else
+				-- worm appatite whetted
+				w.endSecond = Spring.GetGameSeconds() + baseWormDuration
+			end
+		end
 	end
 end
 
