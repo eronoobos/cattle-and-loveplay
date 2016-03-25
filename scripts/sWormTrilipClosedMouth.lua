@@ -8,8 +8,6 @@ local sWormMout2 = piece "sWormMout2"
 local sWormMout3 = piece "sWormMout3"
 local foodmagnet = piece "foodmagnet"
 
-local quakeSnds = { "WmQuake1", "WmQuake2", "WmQuake3", "WmQuake4" }
-
 local sqrtThree = math.sqrt(3)
 
 -- local AttachUnit = Spring.UnitScript.AttachUnit
@@ -49,7 +47,7 @@ local function swallow(idUnitToBeSwallowed)
 	local unitx,unity,unitz=Spring.GetUnitBasePosition(unitID)
 	-- Spring.Echo("init", Spring.GetUnitBasePosition(idUnitToBeSwallowed))
 
-	Spring.PlaySoundFile("WmStampede",8.0,unitx,unity,unitz)
+	Spring.PlaySoundFile("WmStampede",1.5,unitx,unity,unitz)
 
 	MuchDirt(unitx, unity, unitz, 5, 50)
 	Jaws(70, 0.5) --opens Mouth
@@ -63,11 +61,11 @@ local function swallow(idUnitToBeSwallowed)
 	Move(center,y_axis,150,30)-- the whole thing is wheighting tons of tons, so propelling itself out of the sand, slows it down
 
 	MuchDirt(unitx, unity, unitz, 11, 100)
-	Spring.PlaySoundFile("WmRoar2",1.5,unitx,unity,unitz)
+	Spring.PlaySoundFile("WmRoar2",1.0,unitx,unity,unitz)
 	Sleep(200)
-	Spring.PlaySoundFile("WmRoar1",10.0,unitx,unity,unitz)
+	Spring.PlaySoundFile("WmRoar1",1.0,unitx,unity,unitz)
 	Sleep(200)
-	Spring.PlaySoundFile("WmRoar3",3.0,unitx,unity,unitz)
+	Spring.PlaySoundFile("WmRoar3",1.0,unitx,unity,unitz)
 	Sleep(600)
 
 	local unitHeight = uDef.height
@@ -107,16 +105,16 @@ local function swallow(idUnitToBeSwallowed)
 	end
 
 	WaitForMove(center,y_axis)
-	Spring.PlaySoundFile("WmSandExplosion",12.0,unitx,unity,unitz)
+	Spring.PlaySoundFile("WmSandExplosion",2.0,unitx,unity,unitz)
 	Move(center,y_axis,0, 4)
 
 	while true == Spring.UnitScript.IsInMove(center, y_axis) do --spawns cegs and turns the 4fth segmet until the Worm is underground 
 		MuchDirt(unitx, unity, unitz, 1, 200, 10)
 	end
-
 end
 
 function script.Create()
+	Turn(center,y_axis,math.rad(math.random(1,360)),50) -- start in a random rotation
 	Spin(center,y_axis,0.03,1) -- worm rotates slowly
 	local x,y,z = Spring.GetUnitPosition(unitID)
 	if (x and y and z) then

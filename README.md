@@ -210,6 +210,7 @@ v6 -> v7
 - / convert tdf cegs to lua
 - / convert tga bitmaps to png
 - optimize all Spring and math functions
+- use native radar instead of widget radar? by making an invisible unit move around the map as the underground worm
 - rebalance sound volumes in sounds.lua
 - create three different worm sizes, the current being the smallest. worm spawns large enough to eat the largest unit on the sand
 - delete unecessary sounds and images

@@ -43,7 +43,7 @@ local rippleHeight = 1.5 -- height of ripples that worm makes in the sand
 local bulgeHeight = 1.5
 local bulgeSize = 7
 local bulgeScale = 8
-local attackDelay = 12 -- delay between worm attacks
+local attackDelay = 22 -- delay between worm attacks
 local cellSize = 64 -- for wormReDir
 local evalFrequency = 150 -- game frames between evaluation of units on sand
 local signEvalFrequency = 12 -- game frames between parts of a wormsign volley (lower value means more lightning strikes per sign)
@@ -85,7 +85,6 @@ local bulgeZ = { 1, -1, -1, 1 }
 local quakeSnds = { "WmQuake1", "WmQuake2", "WmQuake3", "WmQuake4" }
 local lightningSnds = { "WmLightning1", "WmLightning2", "WmLightning3", "WmLightning4", "WmLightning5" }
 local thunderSnds = { "WmThunder1", "WmThunder2", "WmThunder3", "WmThunder4", "WmThunder5" }
-local sparkSnds = { "WmSpark1", "WmSpark2" }
 
 -- renamed functions
 local mAtan2 = math.atan2
@@ -429,7 +428,8 @@ local function signLightning(x, y, z)
 	Spring.SpawnCEG("WORMSIGN_FLASH",x,y,z,0,1,0,2,0)
 end
 
-local function signArcLightning(x, y, z, arcHeight, squishDiv)
+local function signArcLightning(x, y, z, arcHeight, squishDiv, segLength, flashCeg)
+	flashCeg = flashCeg or "WORMSIGN_FLASH_SMALL"
 	local sub = math.sqrt(arcHeight)
 	local div = sub / 2
 	local xrand = (2*mRandom()) - 1
@@ -445,7 +445,7 @@ local function signArcLightning(x, y, z, arcHeight, squishDiv)
 		local cy = y+ly
 		local cz = z+lz
 		Spring.SpawnCEG("WORMSIGN_LIGHTNING_SMALL",cx,cy,cz,0,1,0,2,0)
-		if i % 24 == 0 then
+		if i % segLength == 0 then
 			xrand = (2*mRandom()) - 1
 			zrand = (2*mRandom()) - 1
 		end
@@ -456,8 +456,8 @@ local function signArcLightning(x, y, z, arcHeight, squishDiv)
 		lz = lz + zrand
 		i = i + 1
 	until cy < gh
-	Spring.SpawnCEG("WORMSIGN_FLASH_SMALL",x,y,z,0,1,0,2,0)
-	Spring.SpawnCEG("WORMSIGN_FLASH_SMALL",lx,ly,lz,0,1,0,2,0)
+	Spring.SpawnCEG(flashCeg,x,y,z,0,1,0,2,0)
+	Spring.SpawnCEG(flashCeg,lx,ly,lz,0,1,0,2,0)
 end
 
 local function wormBigSign(wID)
@@ -465,22 +465,38 @@ local function wormBigSign(wID)
 	local sz = worm[wID].z
 	local sy = Spring.GetGroundHeight(sx, sz)
 	signLightning(sx, sy, sz)
+	-- signArcLightning( sx, sy, sz, mRandom(1500,2000), mRandom(20,30), 200, "WORMSIGN_FLASH" )
 	local snd = thunderSnds[mRandom(#thunderSnds)]
-	Spring.PlaySoundFile(snd,9.0,sx,sy,sz)
+	Spring.PlaySoundFile(snd,1.0,sx,sy,sz)
+end
+
+local function wormMediumSign(wID, randRadius)
+	randRadius = randRadius or 30
+	local w = worm[wID]
+	if not w then return end
+	local sx = w.x + mRandom(-randRadius,randRadius)
+	local sz = w.z + mRandom(-randRadius,randRadius)
+	local sy = Spring.GetGroundHeight(sx, sz)
+	local num = mRandom(1,2)
+	for n=1,num do
+		signArcLightning( sx, sy, sz, mRandom(96,256), mRandom(5,12), 48 )
+	end
+	local snd = lightningSnds[mRandom(#lightningSnds)]
+	Spring.PlaySoundFile(snd,0.33,sx,sy,sz)
 end
 
 local function wormLittleSign(wID, sx, sy, sz)
-	if not sx or not sy or not sx then
-		sx = worm[wID].x
-		sz = worm[wID].z
-		sy = Spring.GetGroundHeight(sx, sz)
-	end
+	local w = worm[wID]
+	if not w then return end
+	sx = sx or w.x
+	sz = sz or w.z
+	sy = sy or Spring.GetGroundHeight(sx, sz)
 	local num = mRandom(1,2)
 	for n=1,num do
-		signArcLightning( sx, sy, sz, mRandom(24,96), 3+mRandom(0,7) )
+		signArcLightning( sx, sy, sz, mRandom(24,96), mRandom(3,10) )
 	end
 	local snd = lightningSnds[mRandom(#lightningSnds)]
-	Spring.PlaySoundFile(snd,0.75,sx,sy,sz)
+	Spring.PlaySoundFile(snd,0.25,sx,sy,sz)
 end
 
 local function initializeRippleMap()
@@ -747,13 +763,16 @@ local function wormDie(wID)
 --	SendToUnsynced("passWorm", wID, nil)
 end
 
-local function wormAttack(targetID)
+local function wormAttack(targetID, wID)
 	local x, y, z = Spring.GetUnitPosition(targetID)
 --	Spring.MarkerAddPoint(x, y, z, "attack!")
 --	Spring.MarkerErasePosition(x, y, z)
 	local unitTeam = Spring.GetUnitTeam(targetID)
 	local attackerID = Spring.CreateUnit(wormEmergeUnitName, x, y, z, 0, gaiaTeam, false)
-	isEmergedWorm[attackerID] = true
+	isEmergedWorm[attackerID] = wID
+	local w = worm[wID]
+	w.emergedID = attackerID
+	w.x, w.z = x, z
 end
 
 
@@ -796,24 +815,24 @@ function gadget:GameFrame(gf)
 	-- worm movement and ripple sign
 	if gf % 4 == 0 then signUnRippleExpand() end
 	for wID, w in pairs(worm) do
-		if w.vx and second > w.lastAttackSecond+attackDelay then
+		if w.vx and not w.emergedID then
 			w.nvx, w.nvz = dynamicAvoidRockVector(wID)
 			w.x = math.max(math.min(w.x + (w.nvx*wormSpeed), sizeX), 0)
 			w.z = math.max(math.min(w.z + (w.nvz*wormSpeed), sizeZ), 0)
 			-- SendToUnsynced("passWorm", wID, w.x, w.z, w.vx, w.vz, w.nvx, w.nvz, w.tx, w.tz, w.signSecond, w.endSecond ) --uncomment this to show the worms positions, vectors, and targets real time (uses gui_worm_debug.lua)
 		end
 		local rippleMult = nil
-		if second > w.signSecond-4 and second < w.signSecond+3 and second > w.lastAttackSecond+attackDelay then
+		if second > w.signSecond-4 and second < w.signSecond+3 then -- and not w.emergedID then
 			-- if it's one second before or after worm sign second, ripple sand
 			if not worm[wID].hasQuaked then
 				local y = Spring.GetGroundHeight(w.x, w.z)
 				local snd = quakeSnds[mRandom(#quakeSnds)]
-				Spring.PlaySoundFile(snd,16.0,w.x,y,w.z)
+				Spring.PlaySoundFile(snd,1.0,w.x,y,w.z)
 				w.hasQuaked = true
 			end
 			lightning = mRandom() < 0.4
 			rippleMult = 1 / (1 + math.abs(second - w.signSecond))
-		elseif w.vx and second > w.lastAttackSecond+attackDelay then
+		elseif w.vx and not w.emergedID then
 			-- when moving, always ripple sand a little with occasional ground lightning
 			lightning = mRandom() < 0.3
 			rippleMult = 0.2
@@ -826,6 +845,9 @@ function gadget:GameFrame(gf)
 				local cegy = Spring.GetGroundHeight(cegx, cegz) + 5
 				Spring.SpawnCEG("sworm_dust",cegx,cegy,cegz,0,1,0,30,0)
 			end
+		end
+		if w.emergedID and mRandom() < 0.01 then
+			wormMediumSign(wID)
 		end
 	end
 	
@@ -871,11 +893,11 @@ function gadget:GameFrame(gf)
 		end
 	end
 
-	if gf % attackEvalFrequency == 0 then
+	if gf % attackEvalFrequency == 0 and numSandUnits > 0 then
 		-- do worm attacks on units that are within range
 		local alreadyAttacked = {}
 		for wID, w in pairs(worm) do
-			if (second > w.lastAttackSecond + attackDelay) and (numSandUnits > 0) then 
+			if not w.emergedID then -- second > w.lastAttackSecond + attackDelay then 
 				local wx = w.x
 				local wz = w.z
 				local wy = Spring.GetGroundHeight(wx, wz)
@@ -897,15 +919,15 @@ function gadget:GameFrame(gf)
 					end
 				end
 				if bestID and not alreadyAttacked[bestID] then
-					w.signSecond = second + 4 -- for ground ripples
-					wormAttack(bestID)
+					w.signSecond = second + 1 -- for ground ripples
+					wormAttack(bestID, wID)
 					w.lastAttackSecond = second
 					alreadyAttacked[bestID] = true
 					w.bellyCount = w.bellyCount + 1
 					if w.bellyCount >= wormBellyLimit then
 						w.endSecond = second + 1
 					end
-					Spring.Echo(w.bellyCount, wormBellyLimit, w.endSecond)
+					-- Spring.Echo(w.bellyCount, wormBellyLimit, w.endSecond)
 				end
 			end
 		end
@@ -917,7 +939,7 @@ function gadget:GameFrame(gf)
 		for wID, w in pairs(worm) do
 			local timeToSign = w.signSecond
 --			Spring.Echo(wID, secondToSign, secondInt, timeToSign, second)
-			if second > timeToSign-3 and second < timeToSign+2 and second > w.lastAttackSecond+attackDelay then
+			if second > timeToSign-3 and second < timeToSign+2 and not w.emergedID then
 				-- local dice = mRandom()
 				-- if dice > 0.95 then
 				if not w.hasSigned and second >= timeToSign then
@@ -946,8 +968,11 @@ function gadget:UnitDestroyed(unitID, unitDefID, teamID, attackerID, attackerDef
 --		SendToUnsynced("passSandUnit", uID, nil)
 	end
 	
-	-- remove from emerged worms to clear table
+	-- remove from emerged worms to clear table and allow worm to attack again
 	if isEmergedWorm[unitID] then
+		local wID = isEmergedWorm[unitID]
+		local w = worm[wID]
+		if w then w.emergedID = nil end
 		isEmergedWorm[unitID] = nil
 	end
 end

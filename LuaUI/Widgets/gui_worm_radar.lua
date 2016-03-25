@@ -23,8 +23,6 @@ local arrowVertTex = "luaui/images/sworm_arrow_Vert.png"
 local arrowDiagTex = "luaui/images/sworm_arrow_diag.png"
 local targetTex = "luaui/images/sworm_target.png"
 
-local sndSignAlarm = "sounds/sign_alarm.wav"
-
 local arrowSize = 64
 local alertSize = 64
 local minimapAlertSize = 20
@@ -192,7 +190,7 @@ function widget:DrawScreen()
 		end
 		-- play one alarm horn if new and more than hornPeriod seconds later
 		-- if s.new and (second > lastHorn + hornPeriod) and (hornCount < hornNumber)  then
-		-- 	Spring.PlaySoundFile(sndSignAlarm, 0.1)
+		-- 	Spring.PlaySoundFile("WmSignAlarm", 0.1)
 		-- 	lastHorn = second
 		-- 	hornCount = hornCount + 1
 		-- end
