@@ -14,17 +14,18 @@ end
 -- configuration variables
 
 -- options that will be set by map options
-local wormSpeed = 1.0 -- how much the worm's vector is multiplied by to produce a position each game frame
+local wormSpeed = 1.0 -- how much the worm's vector is multiplied by to produce a position each game frame. slightly randomized for each worm (+/- 10%)
 local wormEatMex = false -- will worms eat metal extractors?
 local wormEatCommander = false -- will worms eat commanders?
 local wormAggression = 5 -- translates into movementPerWormAnger and unitsPerWormAnger
 
 -- config modified later by map options
-local wormRange = 150 -- range within which worm will attack, modified by attackEvalFrequency and wormSpeed
 local movementPerWormAnger = 100000 / wormAggression -- how much total movement (sum x+y distance plus metal cost per eval frequency of each unit) makes up 1 wormAnger
 local unitsPerWormAnger = 500 / wormAggression
 
 -- non mapoption config
+local wormSpeedLowerBias = 10 -- percentage below wormSpeed that an individual worm's speed can be. lowers with high wormAnger
+local wormSpeedUpperBias = 10 -- percentage above wormSpeed that an individual worm's speed can be
 local boxSize = 1024 -- for finding occupied areas to spawn worms near
 local wormSpawnDistance = 1000 -- how far away from occupied area to spawn worm
 local biteHeight = 32 -- how high above ground in elmos will the worm target and eat units
@@ -72,7 +73,6 @@ local isEmergedWorm = {} -- is unitID an emerged attacking worm?
 local halfCellSize = cellSize / 2
 local sizeX = Game.mapSizeX 
 local sizeZ = Game.mapSizeZ
-local evalNewVector = math.floor(16 / wormSpeed)
 local rippled = {} -- stores references to rippleMap nodes that are actively under transformation
 local rippleMap = {}-- stores locations of sand that has been raised by worm to lower it
 local bulgeProfile = {}
@@ -198,7 +198,7 @@ local function getSandUnitValues()
 end
 
 local function createBulgeProfile(vSize, pSize)
-	Spring.Echo("creating bulge profile")
+	-- Spring.Echo("creating bulge profile")
 	for v=1,vSize do
 		local vh = (1-((v/vSize)^3))
 		bulgeProfile[v] = {}
@@ -211,7 +211,7 @@ local function createBulgeProfile(vSize, pSize)
 end
 
 local function createBulgeStamp(size, scale)
-	Spring.Echo("creating bulge stamp")
+	-- Spring.Echo("creating bulge stamp")
 	local stamp = {}
 	local i = 1
 	for xi=1,size do
@@ -359,7 +359,7 @@ local function wormTargetting()
 						local pvelz = dz / evalFrequency
 						velx = (velx + pvelx) / 2
 						velz = (velz + pvelz) / 2
-						local velmult = dist/wormSpeed
+						local velmult = dist/w.speed
 						local farx = ux + (velx * velmult)
 						local farz = uz + (velz * velmult)
 						local fardist = math.sqrt(DistanceSq(w.x, w.z, farx, farz))
@@ -398,7 +398,7 @@ local function wormTargetting()
 							-- if w.fresh then
 							if w.targetUnitID ~= uID then
 								-- give enough time to get to the worm's new target
-								-- local eta = math.ceil((wormSpeed / 30) * fardist * wormChaseTimeMod) + 20
+								-- local eta = math.ceil((w.speed / 30) * fardist * wormChaseTimeMod) + 20
 								-- w.endSecond = currentSecond + eta
 								-- Spring.Echo("ETA", eta)
 								w.fresh = false
@@ -605,12 +605,11 @@ local function normalizeVector(vx, vz)
 end
 
 local function dynamicAvoidRockVector(wID)
-	local x = worm[wID].x
-	local z = worm[wID].z
-	local vx = worm[wID].vx
-	local vz = worm[wID].vz
+	local w = worm[wID]
+	local x, z, vx, vz = w.x, w.z, w.vx, w.vz
+	local evalDist = math.ceil(evalFrequency * w.speed)
 	local blockDist = -1
-	for far=16, evalFrequency*wormSpeed, 16 do
+	for far=16, evalDist, 16 do
 		local nx = x + (vx*far)
 		local nz = z + (vz*far)
 		local groundType, _ = Spring.GetGroundInfo(nx, nz)
@@ -620,7 +619,6 @@ local function dynamicAvoidRockVector(wID)
 		end
 	end
 	if blockDist == -1 then
---		wormFavoredSide[wID] = nil
 		return vx, vz
 	else
 		-- two perpendicular vectors
@@ -629,9 +627,9 @@ local function dynamicAvoidRockVector(wID)
 		local sandMult = { 2, 2 }
 		local vStart = 1
 		local vEnd = 2
-		if worm[wID].favoredSide then
-			vStart = worm[wID].favoredSide
-			vEnd = worm[wID].favoredSide
+		if w.favoredSide then
+			vStart = w.favoredSide
+			vEnd = w.favoredSide
 		end
 		for v=vStart, vEnd do
 			for m=0.1, 1, 0.1 do
@@ -657,9 +655,9 @@ local function dynamicAvoidRockVector(wID)
 			local revSandMult = { -1, -1 }
 			local vStart = 1
 			local vEnd = 2
-			if worm[wID].favoredSide then
-				vStart = worm[wID].favoredSide
-				vEnd = worm[wID].favoredSide
+			if w.favoredSide then
+				vStart = w.favoredSide
+				vEnd = w.favoredSide
 			end
 			for v=vStart, vEnd do
 				for m=1, 0.1, -0.1 do
@@ -681,8 +679,8 @@ local function dynamicAvoidRockVector(wID)
 			sandMult = revSandMult
 			noMultMult = true
 		end
-		if worm[wID].favoredSide then vBest = worm[wID].favoredSide end
-		local multMult = 1 - ((blockDist-16) / (evalFrequency*wormSpeed))
+		if w.favoredSide then vBest = w.favoredSide end
+		local multMult = 1 - ((blockDist-16) / evalDist)
 		if noMultMult then
 			multMult = 1
 		end
@@ -691,10 +689,10 @@ local function dynamicAvoidRockVector(wID)
 		local nvx = (vMultRemain * vx) + (vMult * pvx[vBest])
 		local nvz = (vMultRemain * vz) + (vMult * pvz[vBest])
 		if noMultMult then
-			worm[wID].vx = nvx
-			worm[wID].vz = nvz
+			w.vx = nvx
+			w.vz = nvz
 		end
-		if not worm[wID].favoredSide then worm[wID].favoredSide = vBest end
+		if not w.favoredSide then w.favoredSide = vBest end
 		return normalizeVector(nvx, nvz)
 	end
 end
@@ -722,9 +720,6 @@ local function wormDirect(wID)
 	local distx = tx - x
 	local distz = tz - z
 	local vx, vz = normalizeVector(distx, distz)
---	local nx = x + (vx*wormSpeed*evalFrequency)
---	local nz = z + (vz*wormSpeed*evalFrequency)
---	vx, vz = avoidRockVector(x, z, nx, nz, vx, vz)
 	worm[wID].vx = vx
 	worm[wID].vz = vz
 --	Spring.MarkerAddPoint(tx, 100, tz, wID)
@@ -764,8 +759,11 @@ local function wormSpawn()
 		end
 		local spawnX, spawnZ = nearestSand(x, z)
 		local wID = id
-		worm[wID] = { x = spawnX, z = spawnZ, endSecond = math.floor(Spring.GetGameSeconds() + baseWormDuration), signSecond = Spring.GetGameSeconds() + mRandom(signFreqMin, signFreqMax), lastAttackSecond = 0, vx = nil, vz = nil, tx = nil, tz = nil, hasQuaked = false, fresh = true, bellyCount = 0 }
+		local speed = wormSpeed + (mRandom(-wormSpeedLowerBias, wormSpeedUpperBias) / 100)
+		local range = math.ceil(((speed * attackEvalFrequency) / 2) + 50)
+		worm[wID] = { x = spawnX, z = spawnZ, endSecond = math.floor(Spring.GetGameSeconds() + baseWormDuration), signSecond = Spring.GetGameSeconds() + mRandom(signFreqMin, signFreqMax), lastAttackSecond = 0, vx = nil, vz = nil, tx = nil, tz = nil, hasQuaked = false, fresh = true, bellyCount = 0, speed = speed, range = range  }
 		wormBigSign(wID)
+		-- Spring.Echo(speed, range)
 		passWormSign(spawnX, spawnZ)
 	end
 end
@@ -802,10 +800,9 @@ function gadget:Initialize()
 		if mapOptions.sworm_aggression then wormAggression = tonumber(mapOptions.sworm_aggression) end
 		movementPerWormAnger = 100000 / wormAggression
 		if mapOptions.sworm_worm_speed then wormSpeed = tonumber(mapOptions.sworm_worm_speed) end
-		wormRange = ((wormSpeed * attackEvalFrequency) / 2) + 50
 		if mapOptions.sworm_eat_mex == "1" then wormEatMex = true end
 		if mapOptions.sworm_eat_commander == "1" then wormEatCommander = true end
-		SendToUnsynced("passWormInit", evalFrequency, wormSpeed, wormRange) -- uncomment for showing worm positions with debug widget
+		SendToUnsynced("passWormInit", evalFrequency, wormSpeed, 65) -- uncomment for showing worm positions with debug widget
 	end
 	if not areWorms then
 		Spring.Echo("Sand worms are not enabled. Sand worm gadget disabled.")
@@ -823,7 +820,7 @@ end
 
 function gadget:GameStart()
 	Spring.Echo("sand worm aggression", wormAggression)
-	Spring.Echo("sand worm speed", wormSpeed)
+	Spring.Echo("sand worm base speed", wormSpeed)
 	Spring.Echo("sand worms eat mex?", wormEatMex)
 	Spring.Echo("sand worms eat commander?", wormEatCommander)
 end
@@ -838,8 +835,8 @@ function gadget:GameFrame(gf)
 	for wID, w in pairs(worm) do
 		if w.vx and not w.emergedID then
 			w.nvx, w.nvz = dynamicAvoidRockVector(wID)
-			w.x = math.max(math.min(w.x + (w.nvx*wormSpeed), sizeX), 0)
-			w.z = math.max(math.min(w.z + (w.nvz*wormSpeed), sizeZ), 0)
+			w.x = math.max(math.min(w.x + (w.nvx*w.speed), sizeX), 0)
+			w.z = math.max(math.min(w.z + (w.nvz*w.speed), sizeZ), 0)
 			-- SendToUnsynced("passWorm", wID, w.x, w.z, w.vx, w.vz, w.nvx, w.nvz, w.tx, w.tz, w.signSecond, w.endSecond ) --uncomment this to show the worms positions, vectors, and targets real time (uses gui_worm_debug.lua)
 		end
 		local rippleMult = nil
@@ -889,21 +886,20 @@ function gadget:GameFrame(gf)
 		wormAnger = ((numSandUnits + 1) / unitsPerWormAnger) + ((totalSandMovement + 1) / movementPerWormAnger)
 		maxWorms = math.min(3, math.ceil(wormAnger))
 		wormBellyLimit = math.min(9, math.ceil(1 + math.sqrt(wormAnger * 21)))
-		wormChance = math.min(1, 0.25 + math.sqrt(wormAnger / 5.4))
+		wormSpeedLowerBias = math.max(0, 10 - math.floor(wormAnger * 4))
+		wormChance = math.min(1, 0.5 + math.sqrt(wormAnger / 12))
 		if wormAnger > 2 then
 			wormEventFrequency = 5
 		else
-			wormEventFrequency = 5 + (3.5 * ((wormAnger - 2) ^ 4))
+			wormEventFrequency = 5 + (0.55 * ((wormAnger - 3) ^ 4))
 		end
 		wormEventFrequency = math.min(60, math.max(5, math.ceil(wormEventFrequency)))
-		Spring.Echo(maxWorms, wormBellyLimit, wormChance, wormEventFrequency, wormAnger, numSandUnits, totalSandMovement, unitsPerWormAnger, movementPerWormAnger, wormAggression)
-		
+		-- Spring.Echo(maxWorms, wormBellyLimit, wormSpeedLowerBias, wormChance, wormEventFrequency, wormAnger, numSandUnits, totalSandMovement, unitsPerWormAnger, movementPerWormAnger, wormAggression)
 		-- spawn worms
 		if numSandUnits > 0 and second >= nextPotentialEvent then
 --			Spring.Echo("potential worm event...")
 			if mRandom() < wormChance then
 				wormSpawn()
---				Spring.Echo("worm spawned!")
 			end
 			nextPotentialEvent = second + wormEventFrequency
 		end
@@ -928,7 +924,7 @@ function gadget:GameFrame(gf)
 				local wx = w.x
 				local wz = w.z
 				local wy = Spring.GetGroundHeight(wx, wz)
-				local unitsNearWorm = Spring.GetUnitsInSphere(wx, wy, wz, wormRange)
+				local unitsNearWorm = Spring.GetUnitsInSphere(wx, wy, wz, w.range)
 				local bestVal = -99999
 				local bestID
 				for k, uID in pairs(unitsNearWorm) do

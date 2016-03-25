@@ -213,7 +213,7 @@ v6 -> v7
 - / more frequent worm spawn events with more worm anger
 - / maximum 3 worms
 - / prevent worms from eating commanders
-- randomize worm speed slightly
+- / randomize worm speed slightly
 - use native radar instead of widget radar? by making an invisible unit move around the map as the underground worm
 - rebalance sound volumes in playback
 - use three-lipped or four-lipped worm?
