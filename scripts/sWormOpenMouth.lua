@@ -29,6 +29,13 @@ local quakeSnds = { sndQuakeA, sndQuakeB, sndQuakeC, sndQuakeD }
 
 function script.Create()
 
+Spring.SetUnitPieceCollisionVolumeData(unitID, sWormMout0, true, 5, 35, 35, 7, 20, 0, 2)
+Spring.SetUnitPieceCollisionVolumeData(unitID, sWormMout2, true, 5, 35, 35, -7, 20, 0, 2)
+Spring.SetUnitPieceCollisionVolumeData(unitID, sWormMout1, true, 35, 35, 5, 0, 20, -7, 2)
+Spring.SetUnitPieceCollisionVolumeData(unitID, sWormMout3, true, 35, 35, 5, 0, 20, 7, 2)
+Spring.SetUnitPieceCollisionVolumeData(unitID, sWormSeg1, true, 70, 60, 70, 0, 0, 0, 1, 1)
+-- ( number unitID, number pieceIndex, boolean enable, number scaleX, number scaleY, number scaleZ, number offsetX, number offsetY, number offsetZ [, number volumeType [, number primaryAxis]] )
+
 --move the worm into the position underground and close mouth
 Move(center,y_axis,-50,0) --Moves the worm underground Instantanously
 closeMouth()
@@ -49,47 +56,6 @@ if (x and y and z) then
 end
 
 Spring.DestroyUnit(unitID, false, true)
-
-end
-
-function reset()
-Turn( center,x_axis,math.rad(0),0)                              
-Turn( sWormSeg1,x_axis,math.rad(0),0)                              
-Turn( sWormSeg2,x_axis,math.rad(0),0)                              
-Turn( sWormSeg3,x_axis,math.rad(0),0)                              
-Turn( sWormSeg4,x_axis,math.rad(0),0)                            
-Turn( sWormMout0,x_axis,math.rad(0),0)                              
-Turn( sWormMout1,x_axis,math.rad(0),0)                              
-Turn( sWormMout2,x_axis,math.rad(0),0)                             
-Turn( sWormMout3,x_axis,math.rad(0),0)                             
-Turn( foodmagnet,x_axis,math.rad(0),0)                            
-
-
-
-Turn( center,y_axis,math.rad(0),0)                              
-Turn( sWormSeg1,y_axis,math.rad(0),0)                              
-Turn( sWormSeg2,y_axis,math.rad(0),0)                              
-Turn( sWormSeg3,y_axis,math.rad(0),0)                              
-Turn( sWormSeg4,y_axis,math.rad(0),0)                            
-Turn( sWormMout0,y_axis,math.rad(0),0)                              
-Turn( sWormMout1,y_axis,math.rad(0),0)                              
-Turn( sWormMout2,y_axis,math.rad(0),0)                             
-Turn( sWormMout3,y_axis,math.rad(0),0)                             
-Turn( foodmagnet,y_axis,math.rad(0),0)                            
-
-
-
-
-Turn( center,z_axis,math.rad(0),0)                              
-Turn( sWormSeg1,z_axis,math.rad(0),0)                              
-Turn( sWormSeg2,z_axis,math.rad(0),0)                              
-Turn( sWormSeg3,z_axis,math.rad(0),0)                              
-Turn( sWormSeg4,z_axis,math.rad(0),0)                            
-Turn( sWormMout0,z_axis,math.rad(0),0)                              
-Turn( sWormMout1,z_axis,math.rad(0),0)                              
-Turn( sWormMout2,z_axis,math.rad(0),0)                             
-Turn( sWormMout3,z_axis,math.rad(0),0)                             
-Turn( foodmagnet,z_axis,math.rad(0),0)                            
 
 end
 
@@ -188,7 +154,7 @@ MuchDirt(unitx, unity, unitz, 6)
 -- WaitForMouth()
 Sleep(50)
 Spring.MoveCtrl.Disable(idUnitToBeSwallowed)
-Spring.AddUnitImpulse(idUnitToBeSwallowed, 0, 6, 0)
+Spring.AddUnitImpulse(idUnitToBeSwallowed, 0, 5, 0)
 Spring.SetUnitHealth(idUnitToBeSwallowed, unitMaxHealth*0.1)
 Spring.SetUnitRotation(idUnitToBeSwallowed, math.random(30)-15, math.random(30)-15, math.random(30)-15)
 openMouth()
