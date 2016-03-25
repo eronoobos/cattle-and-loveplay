@@ -429,6 +429,7 @@ local function signLightning(x, y, z)
 end
 
 local function signArcLightning(x, y, z, arcHeight, squishDiv, segLength, flashCeg)
+	segLength = segLength or 24
 	flashCeg = flashCeg or "WORMSIGN_FLASH_SMALL"
 	local sub = math.sqrt(arcHeight)
 	local div = sub / 2
