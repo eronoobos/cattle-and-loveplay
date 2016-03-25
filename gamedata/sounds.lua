@@ -1,15 +1,5 @@
 local Sounds = {
   SoundItems = {
-    WmSpark1 = {
-      file = "sounds/spark1.ogg",
-      gainmod = 0.2,
-      pitchmod = 0.9,
-    },
-    WmSpark2 = {
-      file = "sounds/spark2.ogg",
-      gainmod = 0.2,
-      pitchmod = 0.9,
-    },
     WmQuake1 = {
       file = "sounds/deep_tremor.wav",
       gainmod = 0.1,
@@ -87,6 +77,31 @@ local Sounds = {
     },
     WmThunder5 = {
       file = "sounds/thunder12sec.ogg", -- http://www.freesfx.co.uk
+      gainmod = 0.1,
+      pitchmod = 0.1,
+    },
+    WmRoar1 = {
+      file = "sounds/reverse_scream-short.ogg",
+      gainmod = 0.1,
+      pitchmod = 0.1,
+    },
+    WmRoar2 = {
+      file = "sounds/loudscream.wav",
+      gainmod = 0.1,
+      pitchmod = 0.05,
+    },
+    WmRoar3 = {
+      file = "sounds/wtf_roar.ogg",
+      gainmod = 0.1,
+      pitchmod = 0.1,
+    },
+    WmSandExplosion = {
+      file = "sounds/sand_explosion.wav",
+      gainmod = 0.1,
+      pitchmod = 0.1,
+    },
+    WmStampede = {
+      file = "sounds/stampedereverse.ogg",
       gainmod = 0.1,
       pitchmod = 0.1,
     },

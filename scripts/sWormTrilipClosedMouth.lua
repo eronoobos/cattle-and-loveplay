@@ -8,23 +8,15 @@ local sWormMout2 = piece "sWormMout2"
 local sWormMout3 = piece "sWormMout3"
 local foodmagnet = piece "foodmagnet"
 
+local quakeSnds = { "WmQuake1", "WmQuake2", "WmQuake3", "WmQuake4" }
+
+local sqrtThree = math.sqrt(3)
+
 -- local AttachUnit = Spring.UnitScript.AttachUnit
 
 local function AttachUnit(pieceNum, passengerID)
 	Spring.UnitAttach(unitID, passengerID, pieceNum)
 end
-
-local sndRoarA = "sounds/reverse_scream.wav"
-local sndRoarB = "sounds/cobra.wav"
-local sndRoarC = "sounds/wtf_roar.wav"
-local sndSandExplosion = "sounds/sand_explosion.wav"
-local sndQuakeA = "sounds/deep_tremor.wav"
-local sndQuakeB = "sounds/low_quake.wav"
-local sndQuakeC = "sounds/rumble_9sec.wav"
-local sndQuakeD = "sounds/rumble_11sec.wav"
-local quakeSnds = { sndQuakeA, sndQuakeB, sndQuakeC, sndQuakeD }
-
-local sqrtThree = math.sqrt(3)
 
 local function Jaws(degree, speed)
 	local longSide = math.rad( (degree / 2) * sqrtThree )
@@ -49,40 +41,38 @@ local function MuchDirt(unitx, unity, unitz, dirtnum, sleepbetween, randradius)
 end
 
 local function swallow(idUnitToBeSwallowed)
+	local uDefID = Spring.GetUnitDefID(idUnitToBeSwallowed)
+	if not uDefID then return end
+	if not UnitDefs then return end
+	local uDef = UnitDefs[uDefID]
+	if not uDef then return end
 	local unitx,unity,unitz=Spring.GetUnitBasePosition(unitID)
 	-- Spring.Echo("init", Spring.GetUnitBasePosition(idUnitToBeSwallowed))
 
-	Spring.PlaySoundFile(sndSandExplosion,15.0,unitx,unity,unitz)
-	Spring.PlaySoundFile(sndRoarA,5.0,unitx,unity,unitz)
+	Spring.PlaySoundFile("WmStampede",8.0,unitx,unity,unitz)
 
 	MuchDirt(unitx, unity, unitz, 5, 50)
 	Jaws(70, 0.5) --opens Mouth
 	MuchDirt(unitx, unity, unitz, 5)
-
-	Spring.PlaySoundFile(sndRoarB,5.0,unitx,unity,unitz)
-	Spring.PlaySoundFile(sndRoarC,4.0,unitx,unity,unitz)
 
 	Spring.MoveCtrl.Enable(idUnitToBeSwallowed)
 	-- Spring.MoveCtrl.SetTrackSlope(idUnitToBeSwallowed, false)
 	Spring.MoveCtrl.SetGroundOffset(idUnitToBeSwallowed, 80)
 	-- AttachUnit(foodmagnet, idUnitToBeSwallowed)
 	MuchDirt(unitx, unity, unitz, 11, 100)
-	Spring.Echo("attached", Spring.GetUnitBasePosition(idUnitToBeSwallowed))
 	Move(center,y_axis,150,30)-- the whole thing is wheighting tons of tons, so propelling itself out of the sand, slows it down
 
 	MuchDirt(unitx, unity, unitz, 11, 100)
+	Spring.PlaySoundFile("WmRoar2",1.5,unitx,unity,unitz)
+	Sleep(200)
+	Spring.PlaySoundFile("WmRoar1",10.0,unitx,unity,unitz)
+	Sleep(200)
+	Spring.PlaySoundFile("WmRoar3",3.0,unitx,unity,unitz)
+	Sleep(600)
 
-	Sleep(1000)--we give the mouth some time so it is allready half opened when the worm breaks through the sand.
-
-	-- Spring.PlaySoundFile(sndRoarB,3.0,unitx,unity,unitz)
-	Spring.PlaySoundFile(quakeSnds[math.random(1,4)],15.0,unitx,unity,unitz)
-
-	local uDefID = Spring.GetUnitDefID(idUnitToBeSwallowed)
-	local unitHeight = UnitDefs[uDefID].height
-	local unitMass = UnitDefs[uDefID].mass
+	local unitHeight = uDef.height
+	local unitMass = uDef.mass
 	local unitHealth, unitMaxHealth = Spring.GetUnitHealth(idUnitToBeSwallowed)
-	Spring.Echo(unitMass, unitHealth, unitMaxHealth)
-
 	Move(foodmagnet,y_axis,-50 - unitHeight, 11) -- expecting unit to be attached to foodmagnet from this point towards
 	Move(center,y_axis,75, 11)
 	MuchDirt(unitx, unity, unitz, 10, 10)
@@ -96,7 +86,7 @@ local function swallow(idUnitToBeSwallowed)
 	-- Spring.SetUnitHealth(idUnitToBeSwallowed, unitMaxHealth*0.1)
 	Spring.MoveCtrl.Disable(idUnitToBeSwallowed)
 	Spring.AddUnitImpulse(idUnitToBeSwallowed, 0, 5, 0)
-	Spring.SetUnitRotation(idUnitToBeSwallowed, math.random(30)-15, math.random(30)-15, math.random(30)-15)
+	Spring.SetUnitRotation(idUnitToBeSwallowed, math.random(40)-20, math.random(40)-20, math.random(40)-20)
 	Sleep(200)
 	Jaws(70, 1)
 	MuchDirt(unitx, unity, unitz, 10, 200)
@@ -117,7 +107,7 @@ local function swallow(idUnitToBeSwallowed)
 	end
 
 	WaitForMove(center,y_axis)
-	Spring.PlaySoundFile(sndSandExplosion,12.0,unitx,unity,unitz)
+	Spring.PlaySoundFile("WmSandExplosion",12.0,unitx,unity,unitz)
 	Move(center,y_axis,0, 4)
 
 	while true == Spring.UnitScript.IsInMove(center, y_axis) do --spawns cegs and turns the 4fth segmet until the Worm is underground 

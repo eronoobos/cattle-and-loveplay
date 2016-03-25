@@ -209,5 +209,7 @@ v6 -> v7
 - / use sounds.lua
 - / convert tdf cegs to lua
 - / convert tga bitmaps to png
-- add dust cegs and more violent ground ripples when worm emerges to attack
 - optimize all Spring and math functions
+- rebalance sound volumes in sounds.lua
+- create three different worm sizes, the current being the smallest. worm spawns large enough to eat the largest unit on the sand
+- delete unecessary sounds and images
