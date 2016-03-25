@@ -102,6 +102,15 @@ local options = {
 		section = '2_sworm_sect',
 		def    = 'false',
 	},
+
+	{
+		key	= 'sworm_eat_commander',
+		name	= 'Eats Commanders',
+		desc	= 'If checked, sand worms will eat commanders.',
+		type   = "bool",
+		section = '2_sworm_sect',
+		def    = 'false',
+	},
 	
 		{
 		key  = 'Economy',

@@ -16,6 +16,7 @@ end
 -- options that will be set by map options
 local wormSpeed = 1.0 -- how much the worm's vector is multiplied by to produce a position each game frame
 local wormEatMex = false -- will worms eat metal extractors?
+local wormEatCommander = false -- will worms eat commanders?
 local wormAggression = 5 -- translates into movementPerWormAnger and unitsPerWormAnger
 
 -- config modified later by map options
@@ -27,7 +28,6 @@ local unitsPerWormAnger = 500 / wormAggression
 local boxSize = 1024 -- for finding occupied areas to spawn worms near
 local wormSpawnDistance = 1000 -- how far away from occupied area to spawn worm
 local biteHeight = 32 -- how high above ground in elmos will the worm target and eat units
-local baseWormChance = 40 -- chance out of 100 that a worm will be spawned every wormEventFrequency seconds (changed by wormAnger)
 local baseWormDuration = 90 -- how long will a worm chase something to eat before giving up
 local wormChaseTimeMod = 2 -- how much to multiply the as-the-crow-flies estimated time of arrival at target. modified by wormAnger
 local distancePerValue = 2000 -- how value converts to distance, to decide between close vs valuable targets
@@ -49,6 +49,7 @@ local signEvalFrequency = 12 -- game frames between parts of a wormsign volley (
 local attackEvalFrequency = 30 -- game frames between attacking units in range of worm under sand
 
 -- storage variables
+local wormChance = 0.1 -- chance out of 1 that a worm appears. changes with worm anger.
 local wormEventFrequency = 55 -- time in seconds between potential worm event. changes with worm anger.
 local wormBellyLimit = 3 -- changes with wormAnger
 local halfBoxSize = boxSize / 2
@@ -183,6 +184,8 @@ local function getSandUnitValues()
 			vals[uDefID] = mexValue
 		elseif uDef.canHover then
 			vals[uDefID] = hoverValue
+		elseif string.find(string.lower(uDef.name), "commander") then
+			vals[uDefID] = commanderValue
 		else
 			local cost = math.floor( uDef.metalCost + (uDef.energyCost / 50) )
 			local fract = (cost - lowest) / range
@@ -302,8 +305,11 @@ local function wormTargetting()
 			if groundType == sandType and uy < groundHeight + biteHeight then
 				local uDefID = Spring.GetUnitDefID(uID)
 				local uDef = UnitDefs[uDefID]
-				if not wormEatMex and (uDef.extractsMetal > 0) then
+				local uval = sandUnitValues[uDefID]
+				if not wormEatMex and uval == mexValue then
 					-- don't target mexes if mapoption says no
+				elseif not wormEatCommander and uval == commanderValue then
+					-- don't target commanders if mapoption says no
 				else
 					local dx, dz = 0, 0
 					if sandUnitPosition[uID] then
@@ -339,7 +345,6 @@ local function wormTargetting()
 						}
 						table.insert(occupiedBoxes, box)
 					end
-					local uval = sandUnitValues[uDefID]
 	--				SendToUnsynced("passSandUnit", uID, uval)
 	--				Spring.Echo("sending", uID, uval)
 					for wID, w in pairs(worm) do
@@ -799,7 +804,7 @@ function gadget:Initialize()
 		if mapOptions.sworm_worm_speed then wormSpeed = tonumber(mapOptions.sworm_worm_speed) end
 		wormRange = ((wormSpeed * attackEvalFrequency) / 2) + 50
 		if mapOptions.sworm_eat_mex == "1" then wormEatMex = true end
-		Spring.Echo("worm range", wormRange)
+		if mapOptions.sworm_eat_commander == "1" then wormEatCommander = true end
 		SendToUnsynced("passWormInit", evalFrequency, wormSpeed, wormRange) -- uncomment for showing worm positions with debug widget
 	end
 	if not areWorms then
@@ -814,6 +819,13 @@ function gadget:Initialize()
 	rippleExpand = createRippleExpansionMap()
 	initializeRippleMap()
 	nextPotentialEvent = Spring.GetGameSeconds() + wormEventFrequency
+end
+
+function gadget:GameStart()
+	Spring.Echo("sand worm aggression", wormAggression)
+	Spring.Echo("sand worm speed", wormSpeed)
+	Spring.Echo("sand worms eat mex?", wormEatMex)
+	Spring.Echo("sand worms eat commander?", wormEatCommander)
 end
 
 function gadget:GameFrame(gf)
@@ -876,21 +888,20 @@ function gadget:GameFrame(gf)
 		-- calculate worm anger & dependent variables
 		wormAnger = ((numSandUnits + 1) / unitsPerWormAnger) + ((totalSandMovement + 1) / movementPerWormAnger)
 		maxWorms = math.min(3, math.ceil(wormAnger))
-		wormBellyLimit = math.min(9, math.ceil(wormAnger * 6) + 1)
-		-- wormEventFrequency = 60 - (wormAnger * 45)
-		-- wormEventFrequency = 8 / wormAnger
+		wormBellyLimit = math.min(9, math.ceil(1 + math.sqrt(wormAnger * 21)))
+		wormChance = math.min(1, 0.25 + math.sqrt(wormAnger / 5.4))
 		if wormAnger > 2 then
 			wormEventFrequency = 5
 		else
 			wormEventFrequency = 5 + (3.5 * ((wormAnger - 2) ^ 4))
 		end
 		wormEventFrequency = math.min(60, math.max(5, math.ceil(wormEventFrequency)))
-		Spring.Echo(maxWorms, wormBellyLimit, wormEventFrequency, wormAnger, numSandUnits, totalSandMovement, unitsPerWormAnger, movementPerWormAnger)
+		Spring.Echo(maxWorms, wormBellyLimit, wormChance, wormEventFrequency, wormAnger, numSandUnits, totalSandMovement, unitsPerWormAnger, movementPerWormAnger, wormAggression)
 		
 		-- spawn worms
 		if numSandUnits > 0 and second >= nextPotentialEvent then
 --			Spring.Echo("potential worm event...")
-			if mRandom(0, 100) < baseWormChance * (1+wormAnger) then
+			if mRandom() < wormChance then
 				wormSpawn()
 --				Spring.Echo("worm spawned!")
 			end
