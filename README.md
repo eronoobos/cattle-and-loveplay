@@ -214,6 +214,8 @@ v6 -> v7
 - / maximum 3 worms
 - / prevent worms from eating commanders
 - / randomize worm speed slightly
+- / open mouth wider (80 degrees?)
+- / unit that aren't getting eaten get stuck if right under emerging worm. either push them away, or eat them, too, if they're small enough
 - use native radar instead of widget radar? by making an invisible unit move around the map as the underground worm
 - rebalance sound volumes in playback
 - use three-lipped or four-lipped worm?
