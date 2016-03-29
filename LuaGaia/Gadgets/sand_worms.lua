@@ -24,6 +24,11 @@ local movementPerWormAnger = 100000 / wormAggression -- how much total movement 
 local unitsPerWormAnger = 500 / wormAggression
 
 -- non mapoption config
+local wormSizes = {
+	[1] = { maxUnitSize = 36, unitName = "sworm1" },
+	[2] = { maxUnitSize = 72, unitName = "sworm2" },
+	[3] = { maxUnitSize = 108, unitName = "sworm3" },
+}
 local wormSpeedLowerBias = 10 -- percentage below wormSpeed that an individual worm's speed can be. lowers with high wormAnger
 local wormSpeedUpperBias = 10 -- percentage above wormSpeed that an individual worm's speed can be
 local boxSize = 1024 -- for finding occupied areas to spawn worms near
@@ -34,6 +39,7 @@ local wormChaseTimeMod = 2 -- how much to multiply the as-the-crow-flies estimat
 local distancePerValue = 2000 -- how value converts to distance, to decide between close vs valuable targets
 local mexValue = -200 -- negative value = inaccuracy of targetting
 local hoverValue = -300 -- negative value = inaccuracy of targetting
+local commanderValue = -100 -- negative value = inaccuracy of targetting
 local wormSignFrequency = 20 -- average time in seconds between worm signs (varies + or - 50%)
 local sandType = "Sand" -- the ground type that worm spawns in
 local wormEmergeUnitName = "sworm" -- what unit the worms emerge and attack as
@@ -50,6 +56,7 @@ local signEvalFrequency = 12 -- game frames between parts of a wormsign volley (
 local attackEvalFrequency = 30 -- game frames between attacking units in range of worm under sand
 
 -- storage variables
+local largestSandUnitSize = 0
 local wormChance = 0.1 -- chance out of 1 that a worm appears. changes with worm anger.
 local wormEventFrequency = 55 -- time in seconds between potential worm event. changes with worm anger.
 local wormBellyLimit = 3 -- changes with wormAnger
@@ -57,7 +64,7 @@ local halfBoxSize = boxSize / 2
 local occupiedBoxes = {}
 local maxWorms = 1 -- how many worms can be in the game at once (changes with wormAnger)
 local wormAnger = 0.1 -- non integer form of above (changed by wormTargetting)
-local nextPotentialEvent = 0 -- when the next worm event is. see wormTargetting() and Initialize()
+local nextPotentialEvent = 0 -- when the next worm event is. see wormTargetting() and Initialize()m
 local areWorms = true -- will be set to false if the map option sand_worms is off
 local sandUnits = {} -- sandUnits[unitID] = true are on sand
 local sandUnitPosition = {}
@@ -75,7 +82,6 @@ local sizeX = Game.mapSizeX
 local sizeZ = Game.mapSizeZ
 local rippled = {} -- stores references to rippleMap nodes that are actively under transformation
 local rippleMap = {}-- stores locations of sand that has been raised by worm to lower it
-local bulgeProfile = {}
 local bulgeStamp = {}
 --local bulgeScaleHalf = bulgeScale / 2
 local bulgeX = { 1, 1, -1, -1 }
@@ -197,19 +203,6 @@ local function getSandUnitValues()
 	return vals
 end
 
-local function createBulgeProfile(vSize, pSize)
-	-- Spring.Echo("creating bulge profile")
-	for v=1,vSize do
-		local vh = (1-((v/vSize)^3))
-		bulgeProfile[v] = {}
-		for p=1,pSize do
-			local ph = vh * (1-((p/pSize)^3))
-			bulgeProfile[v][p] = ph
-			Spring.Echo(v, p, ph)
-		end
-	end
-end
-
 local function createBulgeStamp(size, scale)
 	-- Spring.Echo("creating bulge stamp")
 	local stamp = {}
@@ -296,6 +289,7 @@ local function wormTargetting()
 	totalMovement = 0
 	sandUnits = {}
 	occupiedBoxes = {}
+	largestSandUnitSize = 0
 	for k, uID in pairs(units) do
 		--if unit enters sand, add it to the sand unit table, if it exits, remove it
 		if not isEmergedWorm[uID] then
@@ -311,6 +305,8 @@ local function wormTargetting()
 				elseif not wormEatCommander and uval == commanderValue then
 					-- don't target commanders if mapoption says no
 				else
+					local uSize = uDef.xsize * uDef.zsize
+					if uSize > largestSandUnitSize then largestSandUnitSize = uSize end
 					local dx, dz = 0, 0
 					if sandUnitPosition[uID] then
 						-- add how much the unit has moved since last evaluation to total movement sum
@@ -329,6 +325,7 @@ local function wormTargetting()
 					for ib, box in pairs(occupiedBoxes) do
 						if ux > box.xmin and ux < box.xmax and uz > box.zmin and uz < box.zmax then
 							box.count = box.count + 1
+							if uSize > box.largestUnitSize then box.largestUnitSize = uSize end
 							insideBox = true
 							break
 						end
@@ -342,6 +339,7 @@ local function wormTargetting()
 							zmin = mapClampZ(uz - halfBoxSize),
 							zmax = mapClampZ(uz + halfBoxSize),
 							count = 1,
+							largestUnitSize = uSize,
 						}
 						table.insert(occupiedBoxes, box)
 					end
@@ -747,9 +745,9 @@ local function wormSpawn()
 		w = worm[id]
 	until not w
 	if id <= maxWorms then
-		local x, y, z
+		local x, y, z, box
 		if #occupiedBoxes > 0 then
-			local box = occupiedBoxes[mRandom(#occupiedBoxes)]
+			box = occupiedBoxes[mRandom(#occupiedBoxes)]
 			x, z = box.x, box.z
 			local rvx, rvz = normalizeVector( (mRandom()*2)-1, (mRandom()*2)-1 )
 			local away = wormSpawnDistance
@@ -761,7 +759,16 @@ local function wormSpawn()
 		local wID = id
 		local speed = wormSpeed + (mRandom(-wormSpeedLowerBias, wormSpeedUpperBias) / 100)
 		local range = math.ceil(((speed * attackEvalFrequency) / 2) + 50)
-		worm[wID] = { x = spawnX, z = spawnZ, endSecond = math.floor(Spring.GetGameSeconds() + baseWormDuration), signSecond = Spring.GetGameSeconds() + mRandom(signFreqMin, signFreqMax), lastAttackSecond = 0, vx = nil, vz = nil, tx = nil, tz = nil, hasQuaked = false, fresh = true, bellyCount = 0, speed = speed, range = range  }
+		local size = 1
+		for s, sizeParams in ipairs(wormSizes) do
+			local largest = largestSandUnitSize
+			if box then largest = box.largestUnitSize end
+			if sizeParams.maxUnitSize >= largest then
+				size = s
+				break
+			end
+		end
+		worm[wID] = { x = spawnX, z = spawnZ, endSecond = math.floor(Spring.GetGameSeconds() + baseWormDuration), signSecond = Spring.GetGameSeconds() + mRandom(signFreqMin, signFreqMax), lastAttackSecond = 0, vx = nil, vz = nil, tx = nil, tz = nil, hasQuaked = false, fresh = true, bellyCount = 0, speed = speed, range = range, size = size }
 		wormBigSign(wID)
 		-- Spring.Echo(speed, range)
 		passWormSign(spawnX, spawnZ)
@@ -776,13 +783,13 @@ local function wormDie(wID)
 end
 
 local function wormAttack(targetID, wID)
+	local w = worm[wID]
 	local x, y, z = Spring.GetUnitPosition(targetID)
 --	Spring.MarkerAddPoint(x, y, z, "attack!")
 --	Spring.MarkerErasePosition(x, y, z)
 	local unitTeam = Spring.GetUnitTeam(targetID)
-	local attackerID = Spring.CreateUnit(wormEmergeUnitName, x, y, z, 0, gaiaTeam, false)
+	local attackerID = Spring.CreateUnit(wormSizes[w.size].unitName, x, y, z, 0, gaiaTeam, false)
 	isEmergedWorm[attackerID] = wID
-	local w = worm[wID]
 	w.emergedID = attackerID
 	w.x, w.z = x, z
 end

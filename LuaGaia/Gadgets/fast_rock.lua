@@ -17,11 +17,11 @@ function gadget:GameStart()
 	local mapOptions = Spring.GetMapOptions()
 	if mapOptions then
 		if Spring.GetMapOptions().fast_rock == "0" then
-			Spring.SetTerrainTypeData(128, 1.0, 1.0, 1.0, 0.0)
-			Spring.SetTerrainTypeData(0, 1.0, 1.0, 1.0, 0.0)
+			Spring.SetTerrainTypeData(128, 1.0, 1.0, 1.0, 1.0)
+			Spring.SetTerrainTypeData(0, 1.0, 1.0, 1.0, 1.0)
 		else
-      Spring.SetTerrainTypeData(128, 1.25, 1.0, 1.0, 0.0)
-      Spring.SetTerrainTypeData(0, 1.25, 1.0, 1.0, 0.0)
+      Spring.SetTerrainTypeData(128, 1.25, 1.0, 1.0, 1.0)
+      Spring.SetTerrainTypeData(0, 1.25, 1.0, 1.0, 1.0)
     end
 	end
 end
