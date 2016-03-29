@@ -45,7 +45,6 @@ local sandType = "Sand" -- the ground type that worm spawns in
 local wormEmergeUnitName = "sworm" -- what unit the worms emerge and attack as
 local rippleNumMin = 5
 local rippleNumMax = 10
-local rippleHeight = 1.5 -- height of ripples that worm makes in the sand
 local bulgeHeight = 1.5
 local bulgeSize = 7
 local bulgeScale = 8
@@ -83,7 +82,6 @@ local sizeX = Game.mapSizeX
 local sizeZ = Game.mapSizeZ
 local rippled = {} -- stores references to rippleMap nodes that are actively under transformation
 local rippleMap = {}-- stores locations of sand that has been raised by worm to lower it
-local bulgeStamp = {}
 --local bulgeScaleHalf = bulgeScale / 2
 local bulgeX = { 1, 1, -1, -1 }
 local bulgeZ = { 1, -1, -1, 1 }
@@ -162,16 +160,6 @@ local function loadWormReDir()
 		reDir[cx][cz] = { bx, bz }
 	end
 	return reDir
-end
-
-local function getWormSizes(sizesByUnitName)
-	local sizes = {}
-	for unitName, s in pairs(sizesByUnitName) do
-		local uDef = UnitDefNames[unitName]
-		local size = { maxUnitSize = math.ceil(uDef.radius * 0.888), unitName = unitName }
-		sizes[s] = size
-	end
-	return sizes
 end
 
 local function getSandUnitValues()
@@ -285,6 +273,17 @@ local function nearestSand(ix, iz)
 	end
 end
 
+local function getWormSizes(sizesByUnitName)
+	local sizes = {}
+	for unitName, s in pairs(sizesByUnitName) do
+		local uDef = UnitDefNames[unitName]
+		local bulgeStamp = createBulgeStamp(math.ceil(uDef.radius*1.5 / 8), 8)
+		local size = { maxUnitSize = math.ceil(uDef.radius * 0.888), bulgeStamp = bulgeStamp, unitName = unitName }
+		sizes[s] = size
+	end
+	return sizes
+end
+
 local function wormTargetting()
 	local second = Spring.GetGameSeconds()
 	local units = Spring.GetAllUnits()
@@ -358,7 +357,7 @@ local function wormTargetting()
 	--				SendToUnsynced("passSandUnit", uID, uval)
 	--				Spring.Echo("sending", uID, uval)
 					for wID, w in pairs(worm) do
-						if uSize <= wormSizes[w.size].maxUnitSize then
+						if uSize <= w.maxUnitSize then
 							local x = w.x
 							local z = w.z
 							local distx = math.abs(ux - x)
@@ -545,7 +544,7 @@ local function addRipple(x, z, hmod)
 	end
 end
 
-local function signStampRipple(x, z, mult, lightning)
+local function signStampRipple(x, z, mult, bulgeStamp, lightning)
 	local hmodBase = bulgeHeight*mult
 	if hmodBase > 0.1 then
 		x = x - (x % 8)
@@ -780,7 +779,7 @@ local function wormSpawn()
 		Spring.Echo(largestSandUnitSize, box.largestUnitSize, wormSizes[size].maxUnitSize, size)
 		local uDef = UnitDefNames[wormSizes[size].unitName]
 		local range = math.ceil(((speed * attackEvalFrequency) / 2) + (uDef.radius * 1.4))
-		worm[wID] = { x = spawnX, z = spawnZ, endSecond = math.floor(Spring.GetGameSeconds() + baseWormDuration), signSecond = Spring.GetGameSeconds() + mRandom(signFreqMin, signFreqMax), lastAttackSecond = 0, vx = nil, vz = nil, tx = nil, tz = nil, hasQuaked = false, fresh = true, bellyCount = 0, speed = speed, range = range, size = size }
+		worm[wID] = { x = spawnX, z = spawnZ, endSecond = math.floor(Spring.GetGameSeconds() + baseWormDuration), signSecond = Spring.GetGameSeconds() + mRandom(signFreqMin, signFreqMax), lastAttackSecond = 0, vx = nil, vz = nil, tx = nil, tz = nil, hasQuaked = false, fresh = true, bellyCount = 0, speed = speed, range = range, size = size, maxUnitSize = wormSizes[size].maxUnitSize, unitName = wormSizes[size].unitName, radius = uDef.radius, diameter = uDef.radius * 2, bulgeStamp = wormSizes[size].bulgeStamp }
 		wormBigSign(wID)
 		-- Spring.Echo(speed, range)
 		passWormSign(spawnX, spawnZ)
@@ -800,7 +799,7 @@ local function wormAttack(targetID, wID)
 --	Spring.MarkerAddPoint(x, y, z, "attack!")
 --	Spring.MarkerErasePosition(x, y, z)
 	local unitTeam = Spring.GetUnitTeam(targetID)
-	local attackerID = Spring.CreateUnit(wormSizes[w.size].unitName, x, y, z, 0, gaiaTeam, false)
+	local attackerID = Spring.CreateUnit(w.unitName, x, y, z, 0, gaiaTeam, false)
 	isEmergedWorm[attackerID] = wID
 	w.emergedID = attackerID
 	w.x, w.z = x, z
@@ -832,7 +831,6 @@ function gadget:Initialize()
 	sandUnitValues = getSandUnitValues()
 	gaiaTeam = Spring.GetGaiaTeamID()
 	wormReDir = loadWormReDir()
-	bulgeStamp = createBulgeStamp(bulgeSize, bulgeScale)
 	rippleExpand = createRippleExpansionMap()
 	initializeRippleMap()
 	nextPotentialEvent = Spring.GetGameSeconds() + wormEventFrequency
@@ -876,11 +874,11 @@ function gadget:GameFrame(gf)
 			rippleMult = 0.2
 		end
 		if rippleMult then
-			signStampRipple(w.x, w.z, rippleMult, lightning)
+			signStampRipple(w.x, w.z, rippleMult, w.bulgeStamp, lightning)
 			if mRandom() < rippleMult * 0.1 then
-				local cegx = mapClampX(w.x + mRandom(60) - 30)
-				local cegz = mapClampZ(w.z + mRandom(60) - 30)
-				local cegy = Spring.GetGroundHeight(cegx, cegz) + 5
+				local cegx = mapClampX(w.x + mRandom(w.diameter) - w.radius)
+				local cegz = mapClampZ(w.z + mRandom(w.diameter) - w.radius)
+				local cegy = Spring.GetGroundHeight(cegx, cegz)
 				Spring.SpawnCEG("sworm_dust",cegx,cegy,cegz,0,1,0,30,0)
 			end
 		end
@@ -953,7 +951,7 @@ function gadget:GameFrame(gf)
 						local uDef = UnitDefs[uDefID]
 						if not wormUnits[uDef.name] then
 							local uSize = math.ceil(uDef.radius)
-							if uSize <= wormSizes[w.size].maxUnitSize then
+							if uSize <= w.maxUnitSize then
 								local x, y, z = Spring.GetUnitPosition(uID)
 								local groundType, _ = Spring.GetGroundInfo(x, z)
 								if groundType == sandType and sandUnits[uID] then

@@ -58,11 +58,16 @@ local function AttachUnit(pieceNum, passengerID)
 end
 
 local function SetWormColVols()
-	Spring.SetUnitPieceCollisionVolumeData(unitID, sWormMout2, true, 5, 50, 50, -7, 5, 0, 2)
-	Spring.SetUnitPieceCollisionVolumeData(unitID, sWormMout1, true, 50, 50, 5, 0, 5, -7, 2)
-	Spring.SetUnitPieceCollisionVolumeData(unitID, sWormMout3, true, 50, 50, 5, 0, 5, 7, 2)
-	Spring.SetUnitPieceCollisionVolumeData(unitID, sWormSeg1, true, 70, 65, 70, 0, 0, 0, 1, 1)
-	Spring.SetUnitPieceCollisionVolumeData(unitID, foodmagnet, false, 70, 65, 70, 0, 0, 0, 1, 1)
+	local flap = modelHeight * 0.67
+	local flapOff = (modelHeight*0.1)
+	local thick = modelHeight * 0.067
+	local cylRad = modelRadius * 2
+	local cylHei = modelHeight * 0.867
+	Spring.SetUnitPieceCollisionVolumeData(unitID, sWormMout2, true, thick, flap, flap, -flapOff, thick, 0, 2)
+	Spring.SetUnitPieceCollisionVolumeData(unitID, sWormMout1, true, flap, flap, thick, 0, thick, -flapOff, 2)
+	Spring.SetUnitPieceCollisionVolumeData(unitID, sWormMout3, true, flap, flap, thick, 0, thick, flapOff, 2)
+	Spring.SetUnitPieceCollisionVolumeData(unitID, sWormSeg1, true, cylRad, cylHei, cylRad, 0, 0, 0, 1, 1)
+	Spring.SetUnitPieceCollisionVolumeData(unitID, foodmagnet, false, 1, 1, 1, 0, 0, 0, 1, 1)
 	-- ( number unitID, number pieceIndex, boolean enable, number scaleX, number scaleY, number sca
 end
 
@@ -184,7 +189,6 @@ local function Swallow(doomedByDist)
 		-- Spring.MoveCtrl.Disable(uID)
 	end
 	-- Spring.Echo(mostPieces)
-	local healthInc = 0.9 / mostPieces
 	for p = 1, mostPieces do
 		Jaws(20, 900)
 		Spring.PlaySoundFile("WmRoar3",1.0,x,y,z)
@@ -193,21 +197,11 @@ local function Swallow(doomedByDist)
 		-- Spring.MoveCtrl.SetRotationVelocity(diesFirstID, math.random(2)-1, math.random(2)-1, math.random(2)-1)
 		Sleep(50)
 		MuchDirt(x, y, z, 4)
-		local maxHealthByID = {}
-		local giveHealth = healthInc * ((mostPieces-p)+1)
 		local ate = false
 		for _, uID in pairs(mealIDs) do
 			-- Spring.MoveCtrl.Disable(uID)
-			-- local uDef = mealDefsByID[uID]
-			-- local uMass = uDef.mass
 			local uHealth, uMaxHealth = Spring.GetUnitHealth(uID)
-			maxHealthByID[uID] = uMaxHealth
-			Spring.SetUnitHealth(uID, uMaxHealth * giveHealth)
-			if #mealIDs == 1 then
-				-- Spring.AddUnitImpulse(uID, 0.01, 4, 0.01)
-			else
-				-- Spring.AddUnitImpulse(uID, 0.01, 1, 0.01)
-			end
+			Spring.SetUnitHealth(uID, uHealth / 2)
 			local pieces = piecesByID[uID]
 			if #pieces > 0 then
 				local pieceNumber = 0
@@ -237,9 +231,6 @@ local function Swallow(doomedByDist)
 			MuchDirt(x, y, z, 4, 200)
 			Jaws(80, 60)
 		end
-		-- for _, uID in pairs(mealIDs) do
-			-- ComeToMe(uID, x, y, z)
-		-- end
 		MuchDirt(x, y, z, 5, 200)
 	end
 	Jaws(15, 2)

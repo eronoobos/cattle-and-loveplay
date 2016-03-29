@@ -219,13 +219,12 @@ v6 -> v7
 - / limit second unit to eat by footprint size
 - / instead of first and second meal, just an array of units to eat and an array of units to push away. even ten units may be eaten if the meal is the right size
 - / worm bites off pieces of units
-- damage unit as pieces are bitten off, close mouth almost completely with each bite, and open mouth after each bite more slowly.
-- hide unit pieces as they're bitten off
-- at the end, destroy the unit quietly
-- create three different worm sizes, the current being the smallest. worm spawns large enough to eat the largest unit on the sand
-- BAD IDEA?: rather than movectrl, wait until the worms lips are most of the way out of the sand, and then evaluate what is inside and eat it. use a four-lipped worm to form a cage from with units can't escape. the model must have lips halfway open, so that when the mouth is fully open, the colvols are at 45 degrees or so
+- / hide unit pieces as they're bitten off
+- / create four different worm sizes, the current being the smallest. worm spawns large enough to eat the largest unit on the sand
+- / damage unit by halving current health every time
+- fix broken unit icons
 - use native radar instead of widget radar? by making an invisible unit move around the map as the underground worm
 - rebalance sound volumes in playback
-- use three-lipped or four-lipped worm?
 - optimize all Spring and math functions
 - delete unecessary sounds and images
+- BAD IDEA?: rather than movectrl, wait until the worms lips are most of the way out of the sand, and then evaluate what is inside and eat it. use a four-lipped worm to form a cage from with units can't escape. the model must have lips halfway open, so that when the mouth is fully open, the colvols are at 45 degrees or so
