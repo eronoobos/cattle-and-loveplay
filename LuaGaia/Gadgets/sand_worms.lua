@@ -25,9 +25,9 @@ local unitsPerWormAnger = 500 / wormAggression
 
 -- non mapoption config
 local wormSizes = {
-	[1] = { maxUnitSize = 36, unitName = "sworm1" },
-	[2] = { maxUnitSize = 72, unitName = "sworm2" },
-	[3] = { maxUnitSize = 108, unitName = "sworm3" },
+	[1] = { maxUnitSize = 1620, unitName = "sworm1" },
+	[2] = { maxUnitSize = 6480, unitName = "sworm2" },
+	[3] = { maxUnitSize = 19440, unitName = "sworm3" },
 }
 local wormSpeedLowerBias = 10 -- percentage below wormSpeed that an individual worm's speed can be. lowers with high wormAnger
 local wormSpeedUpperBias = 10 -- percentage above wormSpeed that an individual worm's speed can be
@@ -305,7 +305,7 @@ local function wormTargetting()
 				elseif not wormEatCommander and uval == commanderValue then
 					-- don't target commanders if mapoption says no
 				else
-					local uSize = uDef.xsize * uDef.zsize
+					local uSize = math.ceil(uDef.height * uDef.radius)
 					if uSize > largestSandUnitSize then largestSandUnitSize = uSize end
 					local dx, dz = 0, 0
 					if sandUnitPosition[uID] then
@@ -748,17 +748,13 @@ local function wormSpawn()
 		local x, y, z, box
 		if #occupiedBoxes > 0 then
 			box = occupiedBoxes[mRandom(#occupiedBoxes)]
-			x, z = box.x, box.z
-			local rvx, rvz = normalizeVector( (mRandom()*2)-1, (mRandom()*2)-1 )
-			local away = wormSpawnDistance
-			x, z = x+(rvx*away), z+(rvz*away)
+			x, z = CirclePos(box.x, box.z, wormSpawnDistance)
 		else
 			x, y, z = randomXYZ()
 		end
 		local spawnX, spawnZ = nearestSand(x, z)
 		local wID = id
 		local speed = wormSpeed + (mRandom(-wormSpeedLowerBias, wormSpeedUpperBias) / 100)
-		local range = math.ceil(((speed * attackEvalFrequency) / 2) + 50)
 		local size = 1
 		for s, sizeParams in ipairs(wormSizes) do
 			local largest = largestSandUnitSize
@@ -768,6 +764,9 @@ local function wormSpawn()
 				break
 			end
 		end
+		Spring.Echo(largestSandUnitSize, box.largestUnitSize, wormSizes[size].maxUnitSize, size)
+		local uDef = UnitDefNames[wormSizes[size].unitName]
+		local range = math.ceil(((speed * attackEvalFrequency) / 2) + (uDef.radius * 1.4))
 		worm[wID] = { x = spawnX, z = spawnZ, endSecond = math.floor(Spring.GetGameSeconds() + baseWormDuration), signSecond = Spring.GetGameSeconds() + mRandom(signFreqMin, signFreqMax), lastAttackSecond = 0, vx = nil, vz = nil, tx = nil, tz = nil, hasQuaked = false, fresh = true, bellyCount = 0, speed = speed, range = range, size = size }
 		wormBigSign(wID)
 		-- Spring.Echo(speed, range)

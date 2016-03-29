@@ -12,7 +12,7 @@ local foodmagnet = piece "foodmagnet"
 local uDef
 local modelHeight = 75
 local modelRadius = 36
-local maxMealSize = 32
+local maxMealSize = 36
 local doomRadius = 65
 
 local sqrtThree = math.sqrt(3)
@@ -79,13 +79,25 @@ local function Jaws(degree, speed)
 end
 
 local function MuchDirt(x, y, z, dirtnum, sleepbetween, randradius)
-	randradius = randradius or 25
+	randradius = randradius or modelRadius*0.75
 	for i=1,dirtnum do
 		randX=math.random(-randradius,randradius)
 		randZ=math.random(-randradius,randradius)
 		Spring.SpawnCEG("sworm_dirt",x+randX,y,z+randZ,0,1,0,50,0)
 		if sleepbetween then Sleep(sleepbetween) end
 	end
+end
+
+local function ComeToMe(uID, x, z)
+	local ux, uy, uz = Spring.GetUnitBasePosition(uID)
+	if not ux then return end
+	local distx = ux - x
+	local distz = uz - z
+	Spring.MoveCtrl.Enable(uID)
+	-- Spring.AddUnitImpulse(uID, -distx/10, 0.01, -distz/10)
+	-- Spring.Echo(distx, distz)
+	Spring.MoveCtrl.SetVelocity(uID, -distx/100, 0, -distz/100)
+	Spring.MoveCtrl.SetRotationVelocity(uID, 0, math.random()*0.1-0.05, 0)
 end
 
 local function ToyWith(uID)
@@ -110,7 +122,8 @@ local function Swallow(doomedByDist)
 		if mealSize < maxMealSize then
 			local uDef = GetUnitDef(uID)
 			if uDef then
-				local uSize = uDef.xsize * uDef.zsize
+				local uSize = mCeil(uDef.height * uDef.radius)
+				Spring.Echo(uSize)
 				local newMealSize = mealSize + uSize
 				if newMealSize <= maxMealSize then
 					table.insert(mealIDs, uID)
@@ -128,14 +141,7 @@ local function Swallow(doomedByDist)
 	local x,y,z = Spring.GetUnitBasePosition(unitID)
 
 	for _, uID in pairs(mealIDs) do
-		local ux, uy, uz = Spring.GetUnitBasePosition(uID)
-		local distx = ux - x
-		local distz = uz - z
-		Spring.MoveCtrl.Enable(uID)
-		-- Spring.AddUnitImpulse(uID, -distx/10, 0.01, -distz/10)
-		-- Spring.Echo(distx, distz)
-		Spring.MoveCtrl.SetVelocity(uID, -distx/100, 0, -distz/100)
-		Spring.MoveCtrl.SetRotationVelocity(uID, 0, math.random()*0.1-0.05, 0)
+		ComeToMe(uID, x, z)
 	end
 
 	-- push the rest away from the mouth
@@ -153,7 +159,7 @@ local function Swallow(doomedByDist)
 	Sleep(600)
 
 	-- Move(foodmagnet,y_axis,-50 - unitHeight, 11) -- expecting unit to be attached to foodmagnet from this point towards
-	Move(center,y_axis,75, 11)
+	Move(center, y_axis, modelHeight, mFloor(modelHeight*0.15))
 	MuchDirt(x, y, z, 10, 10)
 	WaitForMove(center,y_axis)
 	local mostPieces = 0
@@ -162,9 +168,11 @@ local function Swallow(doomedByDist)
 		local pieces = Spring.GetUnitPieceList(uID)
 		if mostPieces < #pieces then mostPieces = #pieces end
 		piecesByID[uID] = pieces
-		Spring.MoveCtrl.Disable(uID)
+		-- Spring.MoveCtrl.Disable(uID)
+		Spring.MoveCtrl.SetVelocity(uID, 0, 0, 0)
+		Spring.MoveCtrl.SetRotationVelocity(uID, 0, 0, 0)
 	end
-	Spring.Echo(mostPieces)
+	-- Spring.Echo(mostPieces)
 	local healthInc = 0.9 / mostPieces
 	for p = 1, mostPieces do
 		Jaws(30, 12)
@@ -177,21 +185,22 @@ local function Swallow(doomedByDist)
 		local maxHealthByID = {}
 		local giveHealth = healthInc * ((mostPieces-p)+1)
 		for _, uID in pairs(mealIDs) do
+			-- Spring.MoveCtrl.Disable(uID)
 			-- local uDef = mealDefsByID[uID]
 			-- local uMass = uDef.mass
 			local uHealth, uMaxHealth = Spring.GetUnitHealth(uID)
 			maxHealthByID[uID] = uMaxHealth
 			Spring.SetUnitHealth(uID, uMaxHealth * giveHealth)
 			if #mealIDs == 1 then
-				Spring.AddUnitImpulse(uID, 0.01, 4, 0.01)
+				-- Spring.AddUnitImpulse(uID, 0.01, 4, 0.01)
 			else
-				Spring.AddUnitImpulse(uID, 0.01, 1, 0.01)
+				-- Spring.AddUnitImpulse(uID, 0.01, 1, 0.01)
 			end
 			local pieces = piecesByID[uID]
 			if #pieces > 0 then
 				local pieceNumber = 0
 				pieceNumber = math.random(#pieces)
-				Spring.Echo(pieceNumber, table.remove(pieces, pieceNumber))
+				table.remove(pieces, pieceNumber)
 				-- local exploType = SFX.FALL + SFX.NO_HEATCLOUD
 				local exploType = SFX.SHATTER + SFX.NO_HEATCLOUD
 				if #pieces == 0 then
@@ -199,16 +208,28 @@ local function Swallow(doomedByDist)
 				end
 				Spring.UnitScript.CallAsUnit(uID, Explode, pieceNumber, exploType)
 				if #pieces == 0 then
-					Spring.PlaySoundFile("WmCrush2",1.0,x,y,z)
+					Spring.PlaySoundFile("WmCrush1",1.0,x,y,z)
+					Sleep(50)
+					Spring.PlaySoundFile("WmExplode3",1.0,x,y,z)
 					Spring.DestroyUnit(uID, false, true)
 				else
 					Spring.PlaySoundFile("WmCrush1",1.0,x,y,z)
+					Sleep(50)
+					Spring.PlaySoundFile("WmExplode2",1.0,x,y,z)
 					Spring.UnitScript.CallAsUnit(uID, Hide, pieceNumber)
 				end
+			else
+				Spring.PlaySoundFile("WmCrush1",1.0,x,y,z)
+				Sleep(50)
+				Spring.PlaySoundFile("WmExplode3",1.0,x,y,z)
+				Spring.DestroyUnit(uID, false, true)
 			end
 		end
 		MuchDirt(x, y, z, 4, 200)
 		Jaws(80, 1)
+		-- for _, uID in pairs(mealIDs) do
+			-- ComeToMe(uID, x, z)
+		-- end
 		MuchDirt(x, y, z, 5, 200)
 	end
 	Jaws(25, 3)
@@ -219,8 +240,10 @@ function script.Create()
 	uDef = GetUnitDef(unitID)
 	modelHeight = uDef.height
 	modelRadius = uDef.radius
-	maxMealSize = mCeil(uDef.radius * 0.88)
+	-- maxMealSize = uDef.radius
+	maxMealSize = mCeil(0.6 * (uDef.height * uDef.radius))
 	doomRadius = mFloor(modelRadius * 1.8)
+	Spring.Echo("sworm created", modelHeight, modelRadius, maxMealSize, doomRadius)
 	SetWormColVols()
 	local x,y,z = Spring.GetUnitPosition(unitID)
 	Turn(center,y_axis,math.rad(math.random(1,360)),50) -- start in a random rotation
@@ -232,14 +255,14 @@ function script.Create()
 	Jaws(80, 0.5) --opens Mouth
 	MuchDirt(x, y, z, 5)
 	MuchDirt(x, y, z, 11, 100)
-	Move(center,y_axis,150,30)-- the whole thing is wheighting tons of tons, so propelling itself out of the sand, slows it down
+	Move(center, y_axis, modelHeight*2, mFloor(modelHeight*0.4))-- the whole thing is wheighting tons of tons, so propelling itself out of the sand, slows it down
 	MuchDirt(x, y, z, 11, 100)
 	Spring.PlaySoundFile("WmRoar2",1.0,x,y,z)
 	Sleep(200)
 	Spring.PlaySoundFile("WmRoar1",1.0,x,y,z)
 	Sleep(200)
 	if (x and y and z) then
-		local nearunits = Spring.GetUnitsInSphere(x,y,z, 60)
+		local nearunits = Spring.GetUnitsInSphere(x,y,z, doomRadius)
 		if nearunits then
 			local unitsToSwallow = {}
 			local numToSwallow = 0
@@ -255,7 +278,7 @@ function script.Create()
 	end
 	Sleep(200)
 	Jaws(11, 0.05)
-	Move(center,y_axis,25, 7)
+	Move(center, y_axis, modelHeight/3, mFloor(modelHeight*0.1))
 	-- if (Spring.ValidUnitID (diesFirstID)) then -- this assures, that the unit in the mouth is alive until the very last moment
 			-- Spring.Echo("death", Spring.GetUnitBasePosition(diesFirstID))
 	      -- Spring.DestroyUnit (diesFirstID,false,true) --this destroys the unit without wreckage. Knorke teached me that. If you want to know something, ask him. Its helpfull AND entertaining, to be his pupil.
@@ -265,7 +288,7 @@ function script.Create()
 	end
 	WaitForMove(center,y_axis)
 	Spring.PlaySoundFile("WmSandExplosion",2.0,x,y,z)
-	Move(center,y_axis,0, 4)
+	Move(center, y_axis, 0, mCeil(modelHeight*0.05))
 	while true == Spring.UnitScript.IsInMove(center, y_axis) do --spawns cegs and turns the 4fth segmet until the Worm is underground 
 		MuchDirt(x, y, z, 1, 200, 10)
 	end

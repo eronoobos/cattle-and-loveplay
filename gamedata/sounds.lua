@@ -119,6 +119,36 @@ local Sounds = {
       gainmod = 0.1,
       pitchmod = 0.1,
     },
+    WmCrush1 = {
+      file = "sounds/crunch1.wav",
+      gain = 1.0,
+      gainmod = 0.1,
+      pitchmod = 0.1,
+    },
+    WmCrush2 = {
+      file = "sounds/crunch2.wav",
+      gain = 1.0,
+      gainmod = 0.1,
+      pitchmod = 0.1,
+    },
+    WmExplode1 = {
+      file = "sounds/xplosml1.wav",
+      gain = 1.4,
+      gainmod = 0.1,
+      pitchmod = 0.1,
+    },
+    WmExplode2 = {
+      file = "sounds/xplosml2.wav",
+      gain = 1.4,
+      gainmod = 0.1,
+      pitchmod = 0.1,
+    },
+    WmExplode3 = {
+      file = "sounds/xplosml3.wav",
+      gain = 1.4,
+      gainmod = 0.1,
+      pitchmod = 0.1,
+    },
   },
 }
 
