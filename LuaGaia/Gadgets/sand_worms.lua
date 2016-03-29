@@ -24,11 +24,11 @@ local movementPerWormAnger = 100000 / wormAggression -- how much total movement 
 local unitsPerWormAnger = 500 / wormAggression
 
 -- non mapoption config
-local wormSizes = {
-	[1] = { maxUnitSize = 1620, unitName = "sworm1" },
-	[2] = { maxUnitSize = 6480, unitName = "sworm2" },
-	[3] = { maxUnitSize = 19440, unitName = "sworm3" },
-}
+local wormUnits = { 
+	["sworm1"] = 1,
+	["sworm2"] = 2,
+	["sworm3"] = 3,
+	["sworm4"] = 4, }
 local wormSpeedLowerBias = 10 -- percentage below wormSpeed that an individual worm's speed can be. lowers with high wormAnger
 local wormSpeedUpperBias = 10 -- percentage above wormSpeed that an individual worm's speed can be
 local boxSize = 1024 -- for finding occupied areas to spawn worms near
@@ -56,6 +56,7 @@ local signEvalFrequency = 12 -- game frames between parts of a wormsign volley (
 local attackEvalFrequency = 30 -- game frames between attacking units in range of worm under sand
 
 -- storage variables
+local wormSizes = {}
 local largestSandUnitSize = 0
 local wormChance = 0.1 -- chance out of 1 that a worm appears. changes with worm anger.
 local wormEventFrequency = 55 -- time in seconds between potential worm event. changes with worm anger.
@@ -161,6 +162,16 @@ local function loadWormReDir()
 		reDir[cx][cz] = { bx, bz }
 	end
 	return reDir
+end
+
+local function getWormSizes(sizesByUnitName)
+	local sizes = {}
+	for unitName, s in pairs(sizesByUnitName) do
+		local uDef = UnitDefNames[unitName]
+		local size = { maxUnitSize = math.ceil(uDef.radius * 0.888), unitName = unitName }
+		sizes[s] = size
+	end
+	return sizes
 end
 
 local function getSandUnitValues()
@@ -275,7 +286,7 @@ local function nearestSand(ix, iz)
 end
 
 local function wormTargetting()
-	local currentSecond = Spring.GetGameSeconds()
+	local second = Spring.GetGameSeconds()
 	local units = Spring.GetAllUnits()
 	local num = 0
 	local bestDist = {}
@@ -305,7 +316,8 @@ local function wormTargetting()
 				elseif not wormEatCommander and uval == commanderValue then
 					-- don't target commanders if mapoption says no
 				else
-					local uSize = math.ceil(uDef.height * uDef.radius)
+					-- local uSize = math.ceil(uDef.height * uDef.radius)
+					local uSize = math.ceil(uDef.radius)
 					if uSize > largestSandUnitSize then largestSandUnitSize = uSize end
 					local dx, dz = 0, 0
 					if sandUnitPosition[uID] then
@@ -346,62 +358,63 @@ local function wormTargetting()
 	--				SendToUnsynced("passSandUnit", uID, uval)
 	--				Spring.Echo("sending", uID, uval)
 					for wID, w in pairs(worm) do
-						local x = w.x
-						local z = w.z
-						local distx = math.abs(ux - x)
-						local distz = math.abs(uz - z)
-						local dist = math.sqrt((distx*distx) + (distz*distz))
-						local velx, vely, velz, velLength = Spring.GetUnitVelocity(uID)
-						-- Spring.Echo(velx, vely, velz, velLength)
-						local pvelx = dx / evalFrequency
-						local pvelz = dz / evalFrequency
-						velx = (velx + pvelx) / 2
-						velz = (velz + pvelz) / 2
-						local velmult = dist/w.speed
-						local farx = ux + (velx * velmult)
-						local farz = uz + (velz * velmult)
-						local fardist = math.sqrt(DistanceSq(w.x, w.z, farx, farz))
-	--					Spring.Echo(wID, "sensed unit", uID, "at", ux, uz)
-						if fardist - uval < (bestDist[wID] or 999999) then
-							if uval < 0 then
-								-- for negative values (mexes and hovers)
-								-- target badly, like a radar blip
-								local j = -uval
-								local jx = (mRandom() * j * 2) - j
-								local jz = (mRandom() * j * 2) - j
-								w.tx, w.tz = nearestSand(ux + jx, uz + jz)
-							else
-								local veltestmult = velmult / 1.5
-								local testx = ux + (velx * veltestmult)
-								local testz = uz + (velz * veltestmult)
-								local testa = AngleXYXY(w.x, w.z, testx, testz)
-								local cura = AngleXYXY(w.x, w.z, ux, uz)
-								local adist = AngleDist(cura, testa)
-								-- Spring.Echo(cura, testa, adist)
-								if math.abs(adist) > halfPi then
-									w.tx, w.tz = ux, uz
-									-- Spring.Echo("adist above halfpi, using ux, uz")
-								elseif math.abs(adist) > quarterPi then
-									local fortyFive = quarterPi
-									if adist < 0 then fortyFive = -quarterPi end
-									local newa = AngleAdd(cura, fortyFive)
-									w.tx, w.tz = CirclePos(w.x, w.z, dist, AngleAdd(cura, fortyFive))
-									-- Spring.Echo("adist above quarterpi", fortyFive, newa)
+						if uSize <= wormSizes[w.size].maxUnitSize then
+							local x = w.x
+							local z = w.z
+							local distx = math.abs(ux - x)
+							local distz = math.abs(uz - z)
+							local dist = math.sqrt((distx*distx) + (distz*distz))
+							local velx, vely, velz, velLength = Spring.GetUnitVelocity(uID)
+							-- Spring.Echo(velx, vely, velz, velLength)
+							local pvelx = dx / evalFrequency
+							local pvelz = dz / evalFrequency
+							velx = (velx + pvelx) / 2
+							velz = (velz + pvelz) / 2
+							local velmult = dist/w.speed
+							local farx = ux + (velx * velmult)
+							local farz = uz + (velz * velmult)
+							local fardist = math.sqrt(DistanceSq(w.x, w.z, farx, farz))
+		--					Spring.Echo(wID, "sensed unit", uID, "at", ux, uz)
+							if fardist - uval < (bestDist[wID] or 999999) then
+								if uval < 0 then
+									-- for negative values (mexes and hovers)
+									-- target badly, like a radar blip
+									local j = -uval
+									local jx = (mRandom() * j * 2) - j
+									local jz = (mRandom() * j * 2) - j
+									w.tx, w.tz = nearestSand(ux + jx, uz + jz)
 								else
-									w.tx, w.tz = CirclePos(w.x, w.z, dist, testa)
-									-- Spring.Echo("adist below quarterpi, using testa")
+									local veltestmult = velmult / 1.5
+									local testx = ux + (velx * veltestmult)
+									local testz = uz + (velz * veltestmult)
+									local testa = AngleXYXY(w.x, w.z, testx, testz)
+									local cura = AngleXYXY(w.x, w.z, ux, uz)
+									local adist = AngleDist(cura, testa)
+									-- Spring.Echo(cura, testa, adist)
+									if math.abs(adist) > halfPi then
+										w.tx, w.tz = ux, uz
+										-- Spring.Echo("adist above halfpi, using ux, uz")
+									elseif math.abs(adist) > quarterPi then
+										local fortyFive = quarterPi
+										if adist < 0 then fortyFive = -quarterPi end
+										local newa = AngleAdd(cura, fortyFive)
+										w.tx, w.tz = CirclePos(w.x, w.z, dist, AngleAdd(cura, fortyFive))
+										-- Spring.Echo("adist above quarterpi", fortyFive, newa)
+									else
+										w.tx, w.tz = CirclePos(w.x, w.z, dist, testa)
+										-- Spring.Echo("adist below quarterpi, using testa")
+									end
 								end
+								bestDist[wID] = fardist - uval
+								-- if w.fresh then
+								if w.targetUnitID ~= uID then
+									-- give enough time to get to the worm's new target
+									-- local eta = math.ceil((w.speed / 30) * fardist * wormChaseTimeMod) + 20
+									-- w.endSecond = second + eta
+									w.fresh = false
+								end
+								w.targetUnitID = uID
 							end
-							bestDist[wID] = fardist - uval
-							-- if w.fresh then
-							if w.targetUnitID ~= uID then
-								-- give enough time to get to the worm's new target
-								-- local eta = math.ceil((w.speed / 30) * fardist * wormChaseTimeMod) + 20
-								-- w.endSecond = currentSecond + eta
-								-- Spring.Echo("ETA", eta)
-								w.fresh = false
-							end
-							w.targetUnitID = uID
 						end
 					end
 				end
@@ -815,6 +828,7 @@ function gadget:Initialize()
 		gadgetHandler:RemoveGadget()
 		return
 	end
+	wormSizes = getWormSizes(wormUnits)
 	sandUnitValues = getSandUnitValues()
 	gaiaTeam = Spring.GetGaiaTeamID()
 	wormReDir = loadWormReDir()
@@ -926,7 +940,7 @@ function gadget:GameFrame(gf)
 		-- do worm attacks on units that are within range
 		local alreadyAttacked = {}
 		for wID, w in pairs(worm) do
-			if not w.emergedID then -- second > w.lastAttackSecond + attackDelay then 
+			if not w.emergedID then
 				local wx = w.x
 				local wz = w.z
 				local wy = Spring.GetGroundHeight(wx, wz)
@@ -934,20 +948,27 @@ function gadget:GameFrame(gf)
 				local bestVal = -99999
 				local bestID
 				for k, uID in pairs(unitsNearWorm) do
-					if not isEmergedWorm[uID] then
-						local x, y, z = Spring.GetUnitPosition(uID)
-						local groundType, _ = Spring.GetGroundInfo(x, z)
-						if groundType == sandType and sandUnits[uID] then
-							local uDefID = Spring.GetUnitDefID(uID)
-							local uval = sandUnitValues[uDefID]
-							if uval > bestVal then
-								bestID = uID
-								bestVal = uval
+					if not alreadyAttacked[uID] then
+						local uDefID = Spring.GetUnitDefID(uID)
+						local uDef = UnitDefs[uDefID]
+						if not wormUnits[uDef.name] then
+							local uSize = math.ceil(uDef.radius)
+							if uSize <= wormSizes[w.size].maxUnitSize then
+								local x, y, z = Spring.GetUnitPosition(uID)
+								local groundType, _ = Spring.GetGroundInfo(x, z)
+								if groundType == sandType and sandUnits[uID] then
+									local uDefID = Spring.GetUnitDefID(uID)
+									local uval = sandUnitValues[uDefID]
+									if uval > bestVal then
+										bestID = uID
+										bestVal = uval
+									end
+								end
 							end
 						end
 					end
 				end
-				if bestID and not alreadyAttacked[bestID] then
+				if bestID then
 					w.signSecond = second + 1 -- for ground ripples
 					wormAttack(bestID, wID)
 					w.lastAttackSecond = second
@@ -982,7 +1003,11 @@ function gadget:GameFrame(gf)
 			end
 		end
 	end
-	
+end
+
+function gadget:UnitCreated(unitID, unitDefID, unitTeam, builderID)
+	local uDef = UnitDefs[unitDefID]
+	Spring.Echo(uDef.name, math.ceil(uDef.radius), math.ceil(uDef.height), math.ceil(uDef.radius * uDef.height), math.ceil(uDef.radius + uDef.height))
 end
 
 function gadget:UnitDestroyed(unitID, unitDefID, teamID, attackerID, attackerDefID, attackerTeamID)
