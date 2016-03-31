@@ -201,29 +201,31 @@ local function Swallow(doomedByDist)
 		for _, uID in pairs(mealIDs) do
 			-- Spring.MoveCtrl.Disable(uID)
 			local uHealth, uMaxHealth = Spring.GetUnitHealth(uID)
-			Spring.SetUnitHealth(uID, uHealth / 2)
-			local pieces = piecesByID[uID]
-			if #pieces > 0 then
-				local pieceNumber = 0
-				pieceNumber = math.random(#pieces)
-				table.remove(pieces, pieceNumber)
-				-- local exploType = SFX.FALL + SFX.NO_HEATCLOUD
-				local exploType = SFX.SHATTER + SFX.NO_HEATCLOUD
-				if #pieces == 0 then
-					exploType = SFX.SHATTER
-				end
-				Spring.UnitScript.CallAsUnit(uID, Explode, pieceNumber, exploType)
-				if #pieces == 0 then
-					Spring.PlaySoundFile("WmCrush1",1.0,x,y,z)
-					Sleep(50)
-					Spring.PlaySoundFile("WmExplode3",1.0,x,y,z)
-					Spring.DestroyUnit(uID, false, true)
-					ate = true
-				else
-					Spring.PlaySoundFile("WmCrush1",1.0,x,y,z)
-					Sleep(50)
-					Spring.PlaySoundFile("WmExplode2",1.0,x,y,z)
-					Spring.UnitScript.CallAsUnit(uID, Hide, pieceNumber)
+			if uHealth then
+				Spring.SetUnitHealth(uID, uHealth / 2)
+				local pieces = piecesByID[uID]
+				if #pieces > 0 then
+					local pieceNumber = 0
+					pieceNumber = math.random(#pieces)
+					table.remove(pieces, pieceNumber)
+					-- local exploType = SFX.FALL + SFX.NO_HEATCLOUD
+					local exploType = SFX.SHATTER + SFX.NO_HEATCLOUD
+					if #pieces == 0 then
+						exploType = SFX.SHATTER
+					end
+					Spring.UnitScript.CallAsUnit(uID, Explode, pieceNumber, exploType)
+					if #pieces == 0 then
+						Spring.PlaySoundFile("WmCrush1",1.0,x,y,z)
+						Sleep(50)
+						Spring.PlaySoundFile("WmExplode3",1.0,x,y,z)
+						Spring.DestroyUnit(uID, false, true)
+						ate = true
+					else
+						Spring.PlaySoundFile("WmCrush1",1.0,x,y,z)
+						Sleep(50)
+						Spring.PlaySoundFile("WmExplode2",1.0,x,y,z)
+						Spring.UnitScript.CallAsUnit(uID, Hide, pieceNumber)
+					end
 				end
 			end
 		end
@@ -284,13 +286,13 @@ function script.Create()
 	      -- Spring.DestroyUnit (diesFirstID,false,true) --this destroys the unit without wreckage. Knorke teached me that. If you want to know something, ask him. Its helpfull AND entertaining, to be his pupil.
 	-- end
 	while true == Spring.UnitScript.IsInMove(center, y_axis) do --spawns cegs and turns the 4fth segmet
-		MuchDirt(x, y, z, 1, 100, 15)
+		MuchDirt(x, y, z, 1, 100, modelRadius*0.5)
 	end
 	WaitForMove(center,y_axis)
 	Spring.PlaySoundFile("WmSandExplosion",2.0,x,y,z)
 	Move(center, y_axis, 0, mCeil(modelHeight*0.05))
 	while true == Spring.UnitScript.IsInMove(center, y_axis) do --spawns cegs and turns the 4fth segmet until the Worm is underground 
-		MuchDirt(x, y, z, 1, 200, 10)
+		MuchDirt(x, y, z, 1, 200, modelRadius*0.25)
 	end
 	Spring.DestroyUnit(unitID, false, true)
 end

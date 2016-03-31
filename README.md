@@ -222,11 +222,16 @@ v6 -> v7
 - / hide unit pieces as they're bitten off
 - / create four different worm sizes, the current being the smallest. worm spawns large enough to eat the largest unit on the sand
 - / damage unit by halving current health every time
-- / use unified bulges instead of ripples, with heightmapfunc
-- make cegs and height ripples show how large the worm is, yet not have the height ripples look like crap
-- fix broken unit icons 
-- use native radar instead of widget radar? by making an invisible unit move around the map as the underground worm
+- / add unified bulges with heightmapfunc
+- / only spawn cegs on sand
+- / do not target or eat units near an emerged worm, probably easiest by getting units in radius from each emerged worm and excluding them
+- limit bites to 3 or 4, and shatter multiple pieces at once if necessary
+- only target/eat units at least the worm's radius from the rock
+- make cegs and height ripples show how large the worm is, yet not have the height ripples look like crap when large
+- fix broken unit icons
+- classify worm sizes by sounds used
 - rebalance sound volumes in playback
 - optimize all Spring and math functions
 - delete unecessary sounds and images
+- use native radar instead of widget radar? by making an invisible unit move around the map as the underground worm
 - BAD IDEA?: rather than movectrl, wait until the worms lips are most of the way out of the sand, and then evaluate what is inside and eat it. use a four-lipped worm to form a cage from with units can't escape. the model must have lips halfway open, so that when the mouth is fully open, the colvols are at 45 degrees or so
