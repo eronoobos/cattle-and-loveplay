@@ -45,7 +45,6 @@ local sandType = "Sand" -- the ground type that worm spawns in
 local wormEmergeUnitName = "sworm" -- what unit the worms emerge and attack as
 local rippleNumMin = 5
 local rippleNumMax = 10
-local bulgeHeight = 0.2
 local bulgeSize = 7
 local bulgeScale = 8
 local attackDelay = 22 -- delay between worm attacks
@@ -55,6 +54,7 @@ local signEvalFrequency = 12 -- game frames between parts of a wormsign volley (
 local attackEvalFrequency = 30 -- game frames between attacking units in range of worm under sand
 
 -- storage variables
+local newRipples = {}
 local oldStamps = {}
 local wormSizes = {}
 local largestSandUnitSize = 0
@@ -219,7 +219,7 @@ local function createBulgeStamp(size, scale)
 			if d > 1 then
 				h = 0
 			else
-				h = 1-(d^3)
+				h = 1-(d^2)
 			end
 			local z = diz * scale
 			stamp[i] = { x = x, z = z, h = h }
@@ -299,8 +299,8 @@ local function getWormSizes(sizesByUnitName)
 	local sizes = {}
 	for unitName, s in pairs(sizesByUnitName) do
 		local uDef = UnitDefNames[unitName]
-		local bulgeStamp = createFullBulgeStamp(math.ceil(uDef.radius*1.5 / 8), 8)
-		local size = { maxUnitSize = math.ceil(uDef.radius * 0.888), bulgeStamp = bulgeStamp, unitName = unitName }
+		local bulgeStamp = createFullBulgeStamp(math.ceil(uDef.radius / 8))
+		local size = { maxUnitSize = math.ceil(uDef.radius * 0.888), bulgeStamp = bulgeStamp, rippleHeight = uDef.radius / 20, bulgeHeight = uDef.radius / 120, unitName = unitName }
 		sizes[s] = size
 	end
 	return sizes
@@ -558,16 +558,18 @@ local function addRipple(x, z, hmod)
 			-- Spring.Echo("bad rz in ripplemap", rz)
 			return
 		end
-		if rippleMap[rx][rz] == 0 then table.insert(rippled, {rx, rz}) end
-		rippleMap[rx][rz] = rippleMap[rx][rz] + hmod
-		x = rx * 8
-		z = rz * 8
-		Spring.AdjustHeightMap(x, z, x+8, z+8, hmod)
+		-- if rippleMap[rx][rz] == 0 then
+			table.insert(newRipples, {rx, rz, hmod})
+		-- end
+		-- rippleMap[rx][rz] = rippleMap[rx][rz] + hmod
+		-- x = rx * 8
+		-- z = rz * 8
+		-- Spring.AdjustHeightMap(x, z, x+8, z+8, hmod)
 	end
 end
 
-local function signStampRipple(x, z, mult, bulgeStamp, lightning)
-	local hmodBase = bulgeHeight*mult
+local function signStampRipple(x, z, mult, bulgeStamp, rippleHeight, lightning)
+	local hmodBase = rippleHeight*mult
 	if hmodBase > 0.1 then
 		x = x - (x % 8)
 		z = z - (z % 8)
@@ -577,16 +579,13 @@ local function signStampRipple(x, z, mult, bulgeStamp, lightning)
 		-- local num = 8
 		for n=1,num do
 			stamp = bulgeStamp[mRandom(1,#bulgeStamp)]
-			local bh = stamp.h
+			local bx, bz, bh = stamp.x, stamp.z, stamp.h
 			if bh > 0 then
-				local bx = stamp.x
-				local bz = stamp.z
-				local hmod = bh * hmodBase
-				local d = mRandom(1,4)
-				local sx = x + (bulgeX[d]*bx)
-				local sz = z + (bulgeZ[d]*bz)
+				local sx = x + bx
+				local sz = z + bz
 				local gt, _ = Spring.GetGroundInfo(sx, sz)
 				if gt == sandType then
+					local hmod = bh * hmodBase
 					addRipple(sx, sz, hmod)
 					if lightning then
 						if mRandom() < (0.001 + lmult) then
@@ -600,43 +599,64 @@ local function signStampRipple(x, z, mult, bulgeStamp, lightning)
 	end
 end
 
+local function writeNewRipples()
+	if #newRipples == 0 then return end
+	Spring.SetHeightMapFunc(function()
+		for id, vals in pairs(newRipples) do
+			local rx = vals[1]
+			local rz = vals[2]
+			local x = rx * 8
+			local z = rz * 8
+			local hmod = vals[3]
+			Spring.AddHeightMap(x, z, hmod)
+			if rippleMap[rx][rz] == 0 then
+				table.insert(rippled, {rx, rz})
+			end
+			rippleMap[rx][rz] = rippleMap[rx][rz] + hmod
+		end
+	end)
+	newRipples = {}
+end
+
 local function signUnRippleExpand()
 --	local numripples = #rippled
 --	if numripples > 0 then Spring.Echo(#rippled) end
-	for id, vals in pairs(rippled) do
-		local rx = vals[1]
-		local rz = vals[2]
-		local x = rx * 8
-		local z = rz * 8
-		local hmod = rippleMap[rx][rz]
-		if hmod > 0.2 then
-			local hsub = hmod / 2
-			Spring.AdjustHeightMap(x, z, x+8, z+8, -hsub)
-			rippleMap[rx][rz] = hsub
-			local i = mRandom(1,8)
-			local ex = x + rippleExpand[i].x
-			local ez = z + rippleExpand[i].z
-			local eh = hsub * rippleExpand[i].h
-			addRipple(ex, ez, eh)
-		elseif hmod > 0.1 then
-			Spring.AdjustHeightMap(x, z, x+8, z+8, -0.1)
-			rippleMap[rx][rz] = hmod - 0.1
-		else
-			Spring.AdjustHeightMap(x, z, x+8, z+8, -hmod)
-			rippleMap[rx][rz] = 0
-			table.remove(rippled, id)
+	Spring.SetHeightMapFunc(function()
+		for id = #rippled, 1, -1 do
+			local vals = rippled[id]
+			local rx = vals[1]
+			local rz = vals[2]
+			local x = rx * 8
+			local z = rz * 8
+			local hmod = rippleMap[rx][rz]
+			if hmod >= 0.2 then
+				local hsub = hmod / 2
+				Spring.AddHeightMap(x, z, -hsub)
+				rippleMap[rx][rz] = hsub
+				local i = mRandom(1,8)
+				local ex = x + rippleExpand[i].x
+				local ez = z + rippleExpand[i].z
+				local eh = hsub * rippleExpand[i].h
+				addRipple(ex, ez, eh)
+			else
+				Spring.AddHeightMap(x, z, -hmod)
+				rippleMap[rx][rz] = 0
+				table.remove(rippled, id)
+			end
 		end
-	end
+	end)
 end
 
 local function signStamp(w)
+	local x, z, bh = w.x, w.z, w.bulgeHeight*0.25 + w.bulgeHeight*math.random()
+	x, z = CirclePos(x, z, w.radius*0.25)
 	Spring.SetHeightMapFunc(function()
 		for _, stamp in pairs(w.bulgeStamp) do
-			Spring.AddHeightMap(w.x+stamp.x, w.z+stamp.z, stamp.h*bulgeHeight)
+			Spring.AddHeightMap(x+stamp.x, z+stamp.z, stamp.h*bh)
 		end
 	end)
 	local gf = Spring.GetGameFrame()
-	table.insert(oldStamps, {x = w.x, z = w.z, stamp = w.bulgeStamp, endFrame = gf + 120, halfFrame = gf + 50 })
+	table.insert(oldStamps, {x = x, z = z, bulgeHeight = bh, stamp = w.bulgeStamp, endFrame = gf + 30, halfFrame = gf + 15 })
 end
 
 local function clearOldStamps()
@@ -644,14 +664,15 @@ local function clearOldStamps()
 	Spring.SetHeightMapFunc(function()
 		for i = #oldStamps, 1, -1 do
 			local old = oldStamps[i]
+			local x, z, bh = old.x, old.z, old.bulgeHeight
 			if gf >= old.endFrame then
 				for _, stamp in pairs(old.stamp) do
-					Spring.AddHeightMap(old.x+stamp.x, old.z+stamp.z, -(stamp.h*bulgeHeight)/2)
+					Spring.AddHeightMap(x+stamp.x, z+stamp.z, -(stamp.h*bh)/2)
 				end
 				table.remove(oldStamps, i)
 			elseif not old.halved and gf >= old.halfFrame then
 				for _, stamp in pairs(old.stamp) do
-					Spring.AddHeightMap(old.x+stamp.x, old.z+stamp.z, -(stamp.h*bulgeHeight)/2)
+					Spring.AddHeightMap(x+stamp.x, z+stamp.z, -(stamp.h*bh)/2)
 					old.halved = true
 				end
 			end
@@ -831,7 +852,7 @@ local function wormSpawn()
 		Spring.Echo(largestSandUnitSize, box.largestUnitSize, wormSizes[size].maxUnitSize, size)
 		local uDef = UnitDefNames[wormSizes[size].unitName]
 		local range = math.ceil(((speed * attackEvalFrequency) / 2) + (uDef.radius * 1.4))
-		worm[wID] = { x = spawnX, z = spawnZ, endSecond = math.floor(Spring.GetGameSeconds() + baseWormDuration), signSecond = Spring.GetGameSeconds() + mRandom(signFreqMin, signFreqMax), lastAttackSecond = 0, vx = nil, vz = nil, tx = nil, tz = nil, hasQuaked = false, fresh = true, bellyCount = 0, speed = speed, range = range, size = size, maxUnitSize = wormSizes[size].maxUnitSize, unitName = wormSizes[size].unitName, radius = uDef.radius, diameter = uDef.radius * 2, bulgeStamp = wormSizes[size].bulgeStamp }
+		worm[wID] = { x = spawnX, z = spawnZ, endSecond = math.floor(Spring.GetGameSeconds() + baseWormDuration), signSecond = Spring.GetGameSeconds() + mRandom(signFreqMin, signFreqMax), lastAttackSecond = 0, vx = nil, vz = nil, tx = nil, tz = nil, hasQuaked = false, fresh = true, bellyCount = 0, speed = speed, range = range, size = size, maxUnitSize = wormSizes[size].maxUnitSize, unitName = wormSizes[size].unitName, radius = uDef.radius, diameter = uDef.radius * 2, bulgeStamp = wormSizes[size].bulgeStamp, bulgeHeight = wormSizes[size].bulgeHeight, rippleHeight = wormSizes[size].rippleHeight }
 		wormBigSign(wID)
 		-- Spring.Echo(speed, range)
 		passWormSign(spawnX, spawnZ)
@@ -900,9 +921,10 @@ function gadget:GameFrame(gf)
 	
 	local second = Spring.GetGameSeconds()
 	
-	-- worm movement and ripple sign
 	if gf % 4 == 0 then signUnRippleExpand() end
 	clearOldStamps()
+
+	-- worm movement and ripple sign
 	for wID, w in pairs(worm) do
 		if w.vx and not w.emergedID then
 			w.nvx, w.nvz = dynamicAvoidRockVector(wID)
@@ -930,7 +952,7 @@ function gadget:GameFrame(gf)
 			rippleMult = 0.2
 		end
 		if rippleMult then
-			-- signStampRipple(w.x, w.z, rippleMult, w.bulgeStamp, lightning)
+			signStampRipple(w.x, w.z, rippleMult, w.bulgeStamp, w.rippleHeight, lightning)
 			if mRandom() < rippleMult * 0.1 then
 				local cegx = mapClampX(w.x + mRandom(w.diameter) - w.radius)
 				local cegz = mapClampZ(w.z + mRandom(w.diameter) - w.radius)
@@ -942,7 +964,9 @@ function gadget:GameFrame(gf)
 			wormMediumSign(wID)
 		end
 	end
-	
+
+	writeNewRipples()
+
 	-- evaluation cycle
 	if gf % evalFrequency == 0 then
 	
