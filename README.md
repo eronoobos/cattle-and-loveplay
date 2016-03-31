@@ -222,7 +222,9 @@ v6 -> v7
 - / hide unit pieces as they're bitten off
 - / create four different worm sizes, the current being the smallest. worm spawns large enough to eat the largest unit on the sand
 - / damage unit by halving current health every time
-- fix broken unit icons
+- / use unified bulges instead of ripples, with heightmapfunc
+- make cegs and height ripples show how large the worm is, yet not have the height ripples look like crap
+- fix broken unit icons 
 - use native radar instead of widget radar? by making an invisible unit move around the map as the underground worm
 - rebalance sound volumes in playback
 - optimize all Spring and math functions
