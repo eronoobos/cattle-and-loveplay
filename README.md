@@ -229,6 +229,7 @@ v6 -> v7
 - only target/eat units at least the worm's radius from the rock
 - make cegs and height ripples show how large the worm is, yet not have the height ripples look like crap when large
 - fix broken unit icons
+- make lightning more efficient & less dumb looking by either using cegs properly (with direction vectors and radius), or with opengl lines
 - classify worm sizes by sounds used
 - rebalance sound volumes in playback
 - optimize all Spring and math functions
