@@ -189,7 +189,8 @@ local function Swallow(doomedByDist)
 		-- Spring.MoveCtrl.Disable(uID)
 	end
 	-- Spring.Echo(mostPieces)
-	for p = 1, mostPieces do
+	local bites = math.random(math.min(mostPieces,3), 4)
+	for b = 1, bites do
 		Jaws(20, 900)
 		Spring.PlaySoundFile("WmRoar3",1.0,x,y,z)
 		MuchDirt(x, y, z, 4)
@@ -205,15 +206,17 @@ local function Swallow(doomedByDist)
 				Spring.SetUnitHealth(uID, uHealth / 2)
 				local pieces = piecesByID[uID]
 				if #pieces > 0 then
-					local pieceNumber = 0
-					pieceNumber = math.random(#pieces)
-					table.remove(pieces, pieceNumber)
-					-- local exploType = SFX.FALL + SFX.NO_HEATCLOUD
-					local exploType = SFX.SHATTER + SFX.NO_HEATCLOUD
-					if #pieces == 0 then
-						exploType = SFX.SHATTER
+					local piecesToEat = 1
+					if b == bites then piecesToEat = #pieces end
+					for i = 1, piecesToEat do
+						local pieceNumber = math.random(#pieces)
+						table.remove(pieces, pieceNumber)
+						local exploType = SFX.FALL + SFX.NO_HEATCLOUD
+						-- local exploType = SFX.SHATTER + SFX.NO_HEATCLOUD
+						if #pieces == 0 then exploType = SFX.FALL end
+						Spring.UnitScript.CallAsUnit(uID, Explode, pieceNumber, exploType)
+						Spring.UnitScript.CallAsUnit(uID, Hide, pieceNumber)
 					end
-					Spring.UnitScript.CallAsUnit(uID, Explode, pieceNumber, exploType)
 					if #pieces == 0 then
 						Spring.PlaySoundFile("WmCrush1",1.0,x,y,z)
 						Sleep(50)
@@ -224,7 +227,6 @@ local function Swallow(doomedByDist)
 						Spring.PlaySoundFile("WmCrush1",1.0,x,y,z)
 						Sleep(50)
 						Spring.PlaySoundFile("WmExplode2",1.0,x,y,z)
-						Spring.UnitScript.CallAsUnit(uID, Hide, pieceNumber)
 					end
 				end
 			end

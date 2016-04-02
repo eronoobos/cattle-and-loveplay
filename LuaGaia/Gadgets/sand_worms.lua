@@ -272,13 +272,21 @@ local function nearestRock(x, z, minDist, maxDist)
 	local groundType, _ = Spring.GetGroundInfo(x, z)
 	if groundType ~= sandType then return x, z end
 	-- search for rock
+	local ax, az, aa
 	for dist = minDist, maxDist, 16 do
 		for a = 0, twicePi, quarterPi do
 			local sx, sz = CirclePos(x, z, dist, a)
 			local groundType, _ = Spring.GetGroundInfo(sx, sz)
-			if groundType ~= sandType then return sx, sz end
+			if groundType ~= sandType then
+				if not ax then
+					ax, az, aa = sx, sz, a
+				elseif math.abs(AngleDist(a, aa)) > halfPi*1.5 then
+					return ax, az, sx, sz
+				end
+			end
 		end
 	end
+	if ax then return ax, az end
 	return x, z
 end
 
@@ -287,7 +295,7 @@ local function getWormSizes(sizesByUnitName)
 	for unitName, s in pairs(sizesByUnitName) do
 		local uDef = UnitDefNames[unitName]
 		local bulgeStamp = createFullBulgeStamp(math.ceil(uDef.radius / 8))
-		local size = { radius = uDef.radius, diameter = uDef.radius * 2, maxMealSize = math.ceil(uDef.radius * 0.888), bulgeStamp = bulgeStamp, rippleHeight = uDef.radius / 20, bulgeHeight = uDef.radius / 120, unitName = unitName }
+		local size = { radius = uDef.radius, diameter = uDef.radius * 2, maxMealSize = math.ceil(uDef.radius * 0.888), bulgeStamp = bulgeStamp, rippleHeight = uDef.radius / 20, bulgeHeight = uDef.radius / 120, unitName = unitName, badTargets = {} }
 		sizes[s] = size
 	end
 	return sizes
@@ -320,7 +328,7 @@ end
 
 local function giveTargetToWorms(uID, uSize, uval, ux, uz, dx, dz)
 	for wID, w in pairs(worm) do
-		if uSize <= w.size.maxMealSize then
+		if not w.size.badTargets[uID] and uSize <= w.size.maxMealSize then
 			local x = w.x
 			local z = w.z
 			local distx = math.abs(ux - x)
@@ -918,16 +926,31 @@ end
 
 local function wormAttack(targetID, wID)
 	local w = worm[wID]
-	local x, y, z = Spring.GetUnitPosition(targetID)
-	local rockx, rockz = nearestRock(x, z)
-	local rdx, rdz = x - rockx, z - rockz -- reverse distance, to get angle from rock to unit
-	local rockdist = math.sqrt((rdx*rdx)+(rdz*rdz))
-	-- emerge worm far enough from rock
 	local awayFromRock = w.size.radius * 1 * 1.6
+	local x, y, z = Spring.GetUnitPosition(targetID)
+	local rockx, rockz, rockbx, rockbz = nearestRock(x, z)
+	if rockbx then
+		local rbdx, rbdz = x - rockbx, z - rockbz -- reverse distance, to get angle from rock to unit
+		local rockbdist = math.sqrt((rbdx*rbdx)+(rbdz*rbdz))
+		if rockbdist < w.size.radius then
+			-- not enough room to attack, ignore target for 15 seconds
+			w.size.badTargets[targetID] = Spring.GetGameSeconds() + 15
+			return
+		elseif rockbdist < awayFromRock then
+			rockx = (rockx + rockbx) / 2
+			rockz = (rockz + rockbz) / 2
+		end
+	end
+	local rockdist = 0
+	if rockx ~= x then
+		local rdx, rdz = x - rockx, z - rockz -- reverse distance, to get angle from rock to unit
+		rockdist = math.sqrt((rdx*rdx)+(rdz*rdz))
+	end
+	-- emerge worm far enough from rock
 	-- Spring.MarkerAddPoint(x, 100, z, "sand")
 	-- Spring.MarkerAddPoint(rockx, 100, rockz, "rock")
 	-- Spring.Echo("attack!", x, z, rockx, rockz, rdx, rdz, rockdist, awayFromRock)
-	if rockdist < awayFromRock then
+	if rockdist > 0 and rockdist < awayFromRock then
 		local rockangle = mAtan2(rdz, rdx)
 		x, z = CirclePos(rockx, rockz, awayFromRock, rockangle)
 		-- Spring.MarkerAddPoint(x, 100, z, "new")
@@ -984,8 +1007,8 @@ function gadget:GameFrame(gf)
 	local second = Spring.GetGameSeconds()
 	
 	if gf % 4 == 0 then
-		-- signUnRippleExpand()
-		clearOldStamps()
+		signUnRippleExpand()
+		-- clearOldStamps()
 	end
 
 	-- worm movement and ripple sign
@@ -996,9 +1019,9 @@ function gadget:GameFrame(gf)
 			w.z = math.max(math.min(w.z + (w.nvz*w.speed), sizeZ), 0)
 			-- SendToUnsynced("passWorm", wID, w.x, w.z, w.vx, w.vz, w.nvx, w.nvz, w.tx, w.tz, w.signSecond, w.endSecond ) --uncomment this to show the worms positions, vectors, and targets real time (uses gui_worm_debug.lua)
 		end
-		if not w.emergedID then
-			signStamp(w)
-		end
+		-- if not w.emergedID then
+			-- signStamp(w)
+		-- end
 		local rippleMult = nil
 		if second > w.signSecond-4 and second < w.signSecond+3 then -- and not w.emergedID then
 			-- if it's one second before or after worm sign second, ripple sand
@@ -1010,7 +1033,7 @@ function gadget:GameFrame(gf)
 			rippleMult = 0.2
 		end
 		if rippleMult then
-			-- signStampRipple(w, rippleMult, lightning)
+			signStampRipple(w, rippleMult, lightning)
 			if mRandom() < rippleMult * 0.2 then
 				local cegx = mapClampX(w.x + mRandom(w.size.diameter) - w.size.radius)
 				local cegz = mapClampZ(w.z + mRandom(w.size.diameter) - w.size.radius)
@@ -1026,10 +1049,19 @@ function gadget:GameFrame(gf)
 		end
 	end
 
-	-- writeNewRipples()
+	writeNewRipples()
 
 	-- evaluation cycle
 	if gf % evalFrequency == 0 then
+
+		-- reset bad targets
+		for s, size in pairs(wormSizes) do
+			for uID, endSecond in pairs(size.badTargets) do
+				if second >= endSecond then
+					size.badTargets[uID] = nil
+				end
+			end
+		end
 	
 		-- handle deaths
 		for wID, w in pairs(worm) do
@@ -1094,7 +1126,7 @@ function gadget:GameFrame(gf)
 						-- do not attack units near other emerged worms
 						bestID = nil
 						break
-					elseif not alreadyAttacked[uID] and not excludeUnits[uID] then
+					elseif not alreadyAttacked[uID] and not excludeUnits[uID] and not w.size.badTargets[uID] then
 						local uSize = math.ceil(uDef.radius)
 						if uSize <= w.size.maxMealSize then
 							local x, y, z = Spring.GetUnitPosition(uID)

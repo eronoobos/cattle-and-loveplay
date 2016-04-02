@@ -225,8 +225,8 @@ v6 -> v7
 - / add unified bulges with heightmapfunc
 - / only spawn cegs on sand
 - / do not target or eat units near an emerged worm, probably easiest by getting units in radius from each emerged worm and excluding them
-- limit bites to 3 or 4, and shatter multiple pieces at once if necessary
-- only target/eat units at least the worm's radius from the rock
+- / emerge at least the worm's radius and a bit more from the rock
+- / limit bites to 3 or 4, and shatter multiple pieces at once if necessary
 - make cegs and height ripples show how large the worm is, yet not have the height ripples look like crap when large
 - fix broken unit icons
 - make lightning more efficient & less dumb looking by either using cegs properly (with direction vectors and radius), or with opengl lines
