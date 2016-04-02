@@ -78,7 +78,6 @@ local signFreqMin = wormSignFrequency / 2 -- the minimum pause between worm sign
 local signFreqMax = wormSignFrequency + signFreqMin -- maximum pause between worm signs
 local gaiaTeam -- which team is gaia? (set in Initialize())
 local wormReDir = {} -- precalculated 2d matrix of where to shunt the worm if it tries to move onto rock
-local rockReDir = {} -- precalculated 2d matrix of the nearest rock to a given location on the sand
 local isEmergedWorm = {} -- is unitID an emerged attacking worm?
 local halfCellSize = cellSize / 2
 local sizeX = Game.mapSizeX 
@@ -157,28 +156,6 @@ local function loadWormReDir()
 --		Spring.Echo(cx, cz, bx, bz)
 		if reDir[cx] == nil then reDir[cx] = {} end
 		reDir[cx][cz] = { bx, bz }
-	end
-	return reDir
-end
-
-local function loadReDir()
-	local reDirSizes = VFS.Include('data/redirect_sizes.lua')
---	Spring.Echo("reDir size", reDirSizes[1])
-	local reDirRead = VFS.LoadFile('data/build_redirect_matrix.u8')
-	local reDirTable = VFS.UnpackU8(reDirRead, 1, reDirSizes[1])
---	Spring.Echo("reDirTable size", #reDirTable)
-	local reDir = {}
-	for i=1, reDirSizes[1], 6 do
-		local minbox = reDirTable[i] * 32
-		local cx = reDirTable[i+1] * cellSize
-		local cz = reDirTable[i+2] * cellSize
-		local bx = reDirTable[i+3] * cellSize
-		local bz = reDirTable[i+4] * cellSize
-		local face = reDirTable[i+5]
---		Spring.Echo(minbox, cx, cz, bx, bz, face)
-		if reDir[minbox] == nil then reDir[minbox] = {} end
-		if reDir[minbox][cx] == nil then reDir[minbox][cx] = {} end
-		reDir[minbox][cx][cz] = { bx, bz, face }
 	end
 	return reDir
 end
@@ -288,26 +265,21 @@ local function nearestSand(ix, iz)
 	end
 end
 
-local function nearestRock(ix, iz)
-	-- also clamps to map bounds
-	local x = math.max(math.min(ix, sizeX-halfCellSize), halfCellSize)
-	local z = math.max(math.min(iz, sizeZ-halfCellSize), halfCellSize)
+local function nearestRock(x, z, minDist, maxDist)
+	minDist = minDist or 16
+	maxDist = maxDist or 224
+	x, z = mapClampXZ(x, z)
 	local groundType, _ = Spring.GetGroundInfo(x, z)
-	if groundType ~= sandType then
-		return x, z
-	else
-		local cx = x - (x % cellSize)
-		local cz = z - (z % cellSize)
-		if rockReDir[cx] then
-			if rockReDir[cx][cz] then
-				return rockReDir[cx][cz][1]+halfCellSize, rockReDir[cx][cz][2]+halfCellSize
-			else
-				return x, z
-			end
-		else
-			return x, z
+	if groundType ~= sandType then return x, z end
+	-- search for rock
+	for dist = minDist, maxDist, 16 do
+		for a = 0, twicePi, quarterPi do
+			local sx, sz = CirclePos(x, z, dist, a)
+			local groundType, _ = Spring.GetGroundInfo(sx, sz)
+			if groundType ~= sandType then return sx, sz end
 		end
 	end
+	return x, z
 end
 
 local function getWormSizes(sizesByUnitName)
@@ -510,24 +482,22 @@ end
 -- end
 
 
-local function signArcLightning(x, z, arcLength, lengthPerHeight, segLength, lightningCeg, flashCeg)
+local function signArcLightning(x, z, arcLength, heightDivisor, segLength, lightningCeg, flashCeg)
 	arcLength = arcLength or 48
-	lengthPerHeight = lengthPerHeight or 3
+	heightDivisor = heightDivisor or 1
 	segLength = segLength or 16
 	lightningCeg = lightningCeg or "WORMSIGN_LIGHTNING_SMALL"
 	flashCeg = flashCeg or "WORMSIGN_FLASH_SMALL"
 	local y = Spring.GetGroundHeight(x, z)
-	local sub = math.sqrt(arcLength)
-	local div = sub / 2
 	local xrand = (2*mRandom()) - 1
 	local zrand = (2*mRandom()) - 1
+	local ly = 0
 	local lx = 0
 	local lz = 0
-	local ly = 0
 	local i = 0
 	local gh = y+arcLength
 	repeat
-		ly = ( arcLength-(((i/div)-sub)^2) ) / lengthPerHeight
+		ly =  arcLength * ((0.25-(((i/arcLength)-0.5)^2)) / heightDivisor)
 		local cx = x+lx
 		local cy = y+ly
 		local cz = z+lz
@@ -542,7 +512,7 @@ local function signArcLightning(x, z, arcLength, lengthPerHeight, segLength, lig
 		i = i + 1
 	until cy < gh
 	Spring.SpawnCEG(flashCeg,x,y,z,0,1,0,2,0)
-	Spring.SpawnCEG(flashCeg,x+lx-xrand,ly,z+lz-zrand,0,1,0,2,0)
+	Spring.SpawnCEG(flashCeg,x+lx-xrand,y+ly,z+lz-zrand,0,1,0,2,0)
 end
 
 local function wormBigSign(w)
@@ -551,7 +521,7 @@ local function wormBigSign(w)
 	-- signLightning(sx, sy, sz)
 	local minArc = math.ceil(w.size.radius * 8)
 	local maxArc = math.ceil(w.size.radius * 10)
-	signArcLightning( sx, sz, mRandom(minArc,maxArc), mRandom(5,10), 32, "WORMSIGN_LIGHTNING" )
+	signArcLightning( sx, sz, mRandom(minArc,maxArc), 1+mRandom(), 32, "WORMSIGN_LIGHTNING", "WORMSIGN_FLASH" )
 	local snd = thunderSnds[mRandom(#thunderSnds)]
 	Spring.PlaySoundFile(snd,1.0,sx,sy,sz)
 end
@@ -563,7 +533,7 @@ local function wormMediumSign(w)
 	local minArc = math.ceil(w.size.radius * 3)
 	local maxArc = math.ceil(w.size.radius * 6)
 	for n=1,num do
-		signArcLightning( sx, sz, mRandom(minArc,maxArc), mRandom(4,9), 24 )
+		signArcLightning( sx, sz, mRandom(minArc,maxArc), mRandom(1,3), 24 )
 	end
 	local snd = lightningSnds[mRandom(#lightningSnds)]
 	Spring.PlaySoundFile(snd,0.33,sx,sy,sz)
@@ -583,7 +553,7 @@ local function wormLittleSign(w, sx, sz)
 		maxArc = 96
 	end
 	for n=1,num do
-		signArcLightning( sx, sz, mRandom(minArc, maxArc), mRandom(3,8) )
+		signArcLightning( sx, sz, mRandom(minArc, maxArc), mRandom(2,5) )
 	end
 	local snd = lightningSnds[mRandom(#lightningSnds)]
 	Spring.PlaySoundFile(snd,0.25,sx,sy,sz)
@@ -950,16 +920,19 @@ local function wormAttack(targetID, wID)
 	local w = worm[wID]
 	local x, y, z = Spring.GetUnitPosition(targetID)
 	local rockx, rockz = nearestRock(x, z)
-	local rdx, rdz = x - rockx, z - rockz
-	local rockdist = math.sqrt((rockx*rockx)+(rockz*rockz))
-	-- spawn worm far enough from rock
-	local awayFromRock = w.size.radius * 1.5
+	local rdx, rdz = x - rockx, z - rockz -- reverse distance, to get angle from rock to unit
+	local rockdist = math.sqrt((rdx*rdx)+(rdz*rdz))
+	-- emerge worm far enough from rock
+	local awayFromRock = w.size.radius * 1 * 1.6
+	-- Spring.MarkerAddPoint(x, 100, z, "sand")
+	-- Spring.MarkerAddPoint(rockx, 100, rockz, "rock")
+	-- Spring.Echo("attack!", x, z, rockx, rockz, rdx, rdz, rockdist, awayFromRock)
 	if rockdist < awayFromRock then
-		local rockangle = mAtan2(dz, dx)
-		x, z = CirclePos(x, z, awayFromRock, rockangle)
+		local rockangle = mAtan2(rdz, rdx)
+		x, z = CirclePos(rockx, rockz, awayFromRock, rockangle)
+		-- Spring.MarkerAddPoint(x, 100, z, "new")
+		y = Spring.GetGroundHeight(x, z)
 	end
---	Spring.MarkerAddPoint(x, y, z, "attack!")
---	Spring.MarkerErasePosition(x, y, z)
 	local unitTeam = Spring.GetUnitTeam(targetID)
 	local attackerID = Spring.CreateUnit(w.size.unitName, x, y, z, 0, gaiaTeam, false)
 	isEmergedWorm[attackerID] = wID
@@ -993,7 +966,6 @@ function gadget:Initialize()
 	sandUnitValues = getSandUnitValues()
 	gaiaTeam = Spring.GetGaiaTeamID()
 	wormReDir = loadWormReDir()
-	rockReDir = loadReDir()
 	rippleExpand = createRippleExpansionMap()
 	initializeRippleMap()
 	nextPotentialEvent = Spring.GetGameSeconds() + wormEventFrequency
@@ -1160,10 +1132,8 @@ function gadget:GameFrame(gf)
 	if gf % signEvalFrequency == 0 then
 		for wID, w in pairs(worm) do
 			if not w.emergedID then
-				wormBigSign(w)
-				-- if mRandom() > 0.95 then
 				if not w.hasSigned and second >= w.signSecond then
-					-- wormBigSign(w)
+					wormBigSign(w)
 					passWormSign(w.x, w.z)
 					w.hasSigned = true
 				end
