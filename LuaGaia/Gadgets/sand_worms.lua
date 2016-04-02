@@ -54,6 +54,8 @@ local signEvalFrequency = 12 -- game frames between parts of a wormsign volley (
 local attackEvalFrequency = 30 -- game frames between attacking units in range of worm under sand
 
 -- storage variables
+local valid_node_func
+local wormGraph = {}
 local excludeUnits = {}
 local newRipples = {}
 local oldStamps = {}
@@ -158,6 +160,37 @@ local function loadWormReDir()
 		reDir[cx][cz] = { bx, bz }
 	end
 	return reDir
+end
+
+local function convertWormReDir(reDir)
+	local graph = {}
+	local id = 1
+	-- for cx, zz in pairs(reDir) do
+	-- 	for cz, coord in pairs(zz) do
+	-- 		local node = {
+	-- 			x = cx+halfCellSize,
+	-- 			y = cz+halfCellSize,
+	-- 			id = id,
+	-- 			sand = false,
+	-- 		}
+	-- 		table.insert(graph, node)
+	-- 		id = id + 1
+	-- 	end
+	-- end
+	for cx = 0, sizeX, cellSize do
+		for cz = 0, sizeZ, cellSize do
+			if not reDir[cx] or not reDir[cx][cz] then
+				local node = {
+					x = cx+halfCellSize,
+					y = cz+halfCellSize,
+					id = id,
+				}
+				table.insert(graph, node)
+				id = id + 1
+			end
+		end
+	end
+	return graph
 end
 
 local function getSandUnitValues()
@@ -731,10 +764,9 @@ local function normalizeVector(vx, vz)
 	return vx, vz
 end
 
-local function dynamicAvoidRockVector(wID)
-	local w = worm[wID]
+local function dynamicAvoidRockVector(w)
 	local x, z, vx, vz = w.x, w.z, w.vx, w.vz
-	local evalDist = math.ceil(evalFrequency * w.speed)
+	local evalDist = math.ceil((evalFrequency * w.speed) + w.size.radius)
 	local blockDist = -1
 	for far=16, evalDist, 16 do
 		local nx = x + (vx*far)
@@ -748,6 +780,7 @@ local function dynamicAvoidRockVector(wID)
 	if blockDist == -1 then
 		return vx, vz
 	else
+		local blockTestDist = blockDist + w.size.radius
 		-- two perpendicular vectors
 		local pvx = { -vz, vz }
 		local pvz = { vx, -vx }
@@ -763,8 +796,8 @@ local function dynamicAvoidRockVector(wID)
 				local mr = 1 - m
 				local mvx = (mr * vx) + (m * pvx[v])
 				local mvz = (mr * vz) + (m * pvz[v])
-				local tx = x + (mvx*blockDist)
-				local tz = z + (mvz*blockDist)
+				local tx = x + (mvx*blockTestDist)
+				local tz = z + (mvz*blockTestDist)
 				local gt, _ = Spring.GetGroundInfo(tx, tz)
 				if gt == sandType then
 					sandMult[v] = m
@@ -791,8 +824,8 @@ local function dynamicAvoidRockVector(wID)
 					local mr = 1 - m
 					local mvx = (mr * vx) + (m * pvx[v])
 					local mvz = (mr * vz) + (m * pvz[v])
-					local tx = x + (mvx*blockDist)
-					local tz = z + (mvz*blockDist)
+					local tx = x + (mvx*blockTestDist)
+					local tz = z + (mvz*blockTestDist)
 					local gt, _ = Spring.GetGroundInfo(tx, tz)
 					if gt == sandType then
 						revSandMult[v] = m
@@ -807,7 +840,7 @@ local function dynamicAvoidRockVector(wID)
 			noMultMult = true
 		end
 		if w.favoredSide then vBest = w.favoredSide end
-		local multMult = 1 - ((blockDist-16) / evalDist)
+		local multMult = 1 - ((blockTestDist-16) / evalDist)
 		if noMultMult then
 			multMult = 1
 		end
@@ -941,9 +974,9 @@ local function wormAttack(targetID, wID)
 			rockz = (rockz + rockbz) / 2
 		end
 	end
-	local rockdist = 0
+	local rockdist, rdx, rdz = 0, 0, 0
 	if rockx ~= x then
-		local rdx, rdz = x - rockx, z - rockz -- reverse distance, to get angle from rock to unit
+		rdx, rdz = x - rockx, z - rockz -- reverse distance, to get angle from rock to unit
 		rockdist = math.sqrt((rdx*rdx)+(rdz*rdz))
 	end
 	-- emerge worm far enough from rock
@@ -967,6 +1000,8 @@ end
 -- synced
 if gadgetHandler:IsSyncedCode() then
 
+local astar = {}
+
 function gadget:Initialize()
 	local mapOptions = Spring.GetMapOptions()
 	if mapOptions then
@@ -989,6 +1024,15 @@ function gadget:Initialize()
 	sandUnitValues = getSandUnitValues()
 	gaiaTeam = Spring.GetGaiaTeamID()
 	wormReDir = loadWormReDir()
+	wormGraph = convertWormReDir(wormReDir)
+	astar = VFS.Include('a-star-lua/a-star.lua')
+	valid_node_func = function ( node, neighbor ) 
+		local MAX_DIST = 92
+		if neighbor and astar.distance ( node.x, node.y, neighbor.x, neighbor.y ) < MAX_DIST then
+			return true
+		end
+		return false
+	end
 	rippleExpand = createRippleExpansionMap()
 	initializeRippleMap()
 	nextPotentialEvent = Spring.GetGameSeconds() + wormEventFrequency
@@ -1014,9 +1058,9 @@ function gadget:GameFrame(gf)
 	-- worm movement and ripple sign
 	for wID, w in pairs(worm) do
 		if w.vx and not w.emergedID then
-			w.nvx, w.nvz = dynamicAvoidRockVector(wID)
-			w.x = math.max(math.min(w.x + (w.nvx*w.speed), sizeX), 0)
-			w.z = math.max(math.min(w.z + (w.nvz*w.speed), sizeZ), 0)
+			w.nvx, w.nvz = dynamicAvoidRockVector(w)
+			w.x = mapClampX(w.x + (w.nvx*w.speed))
+			w.z = mapClampZ(w.z + (w.nvz*w.speed))
 			-- SendToUnsynced("passWorm", wID, w.x, w.z, w.vx, w.vz, w.nvx, w.nvz, w.tx, w.tz, w.signSecond, w.endSecond ) --uncomment this to show the worms positions, vectors, and targets real time (uses gui_worm_debug.lua)
 		end
 		-- if not w.emergedID then
@@ -1188,6 +1232,15 @@ end
 function gadget:UnitCreated(unitID, unitDefID, unitTeam, builderID)
 	local uDef = UnitDefs[unitDefID]
 	if uDef.name == "wormtrigger" then
+		local path = astar.path ( wormGraph[1], wormGraph[#wormGraph], wormGraph, true, valid_node_func )
+		if path then
+			for i, node in ipairs(path) do
+				Spring.Echo(node.id, node.x, node.y)
+				Spring.MarkerAddPoint(node.x, 100, node.y, node.id)
+			end
+		else
+			Spring.Echo("no path")
+		end
 		local x, y, z = Spring.GetUnitPosition(unitID)
 		wormSpawn(x, z) -- to make testing easier
 		Spring.DestroyUnit(unitID, false, true)
