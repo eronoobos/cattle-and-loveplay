@@ -54,8 +54,10 @@ local signEvalFrequency = 12 -- game frames between parts of a wormsign volley (
 local attackEvalFrequency = 30 -- game frames between attacking units in range of worm under sand
 
 -- storage variables
-local valid_node_func
-local wormGraph = {}
+local valid_node_func2
+local valid_node_func4
+local wormGraph2 = {}
+local wormGraph4 = {}
 local excludeUnits = {}
 local newRipples = {}
 local oldStamps = {}
@@ -162,27 +164,28 @@ local function loadWormReDir()
 	return reDir
 end
 
-local function convertWormReDir(reDir)
+local function convertWormReDir(reDir, cellsWide)
+	cellsWide = cellsWide or 1
+	local width = cellSize * cellsWide
+	local halfWidth = math.ceil(width / 2)
 	local graph = {}
 	local id = 1
-	-- for cx, zz in pairs(reDir) do
-	-- 	for cz, coord in pairs(zz) do
-	-- 		local node = {
-	-- 			x = cx+halfCellSize,
-	-- 			y = cz+halfCellSize,
-	-- 			id = id,
-	-- 			sand = false,
-	-- 		}
-	-- 		table.insert(graph, node)
-	-- 		id = id + 1
-	-- 	end
-	-- end
-	for cx = 0, sizeX, cellSize do
-		for cz = 0, sizeZ, cellSize do
-			if not reDir[cx] or not reDir[cx][cz] then
+	for x = 0, sizeX, width do
+		for z = 0, sizeZ, width do
+			local sand = true
+			for cx = x, x+width, cellSize do
+				for cz = z, z+width, cellSize do
+					if reDir[cx] and reDir[cx][cz] then
+						sand = false
+						break
+					end
+					if not sand then break end
+				end
+			end
+			if sand then
 				local node = {
-					x = cx+halfCellSize,
-					y = cz+halfCellSize,
+					x = x+halfWidth,
+					y = z+halfWidth,
 					id = id,
 				}
 				table.insert(graph, node)
@@ -1024,11 +1027,17 @@ function gadget:Initialize()
 	sandUnitValues = getSandUnitValues()
 	gaiaTeam = Spring.GetGaiaTeamID()
 	wormReDir = loadWormReDir()
-	wormGraph = convertWormReDir(wormReDir)
+	wormGraph2 = convertWormReDir(wormReDir, 2)
+	wormGraph4 = convertWormReDir(wormReDir, 4)
 	astar = VFS.Include('a-star-lua/a-star.lua')
-	valid_node_func = function ( node, neighbor ) 
-		local MAX_DIST = 92
-		if neighbor and astar.distance ( node.x, node.y, neighbor.x, neighbor.y ) < MAX_DIST then
+	valid_node_func2 = function ( node, neighbor ) 
+		if astar.distance( node.x, node.y, neighbor.x, neighbor.y) < 32769 then
+			return true
+		end
+		return false
+	end
+	valid_node_func4 = function ( node, neighbor ) 
+		if astar.distance( node.x, node.y, neighbor.x, neighbor.y) < 131073 then
 			return true
 		end
 		return false
@@ -1232,11 +1241,10 @@ end
 function gadget:UnitCreated(unitID, unitDefID, unitTeam, builderID)
 	local uDef = UnitDefs[unitDefID]
 	if uDef.name == "wormtrigger" then
-		local path = astar.path ( wormGraph[1], wormGraph[#wormGraph], wormGraph, true, valid_node_func )
+		local path = astar.path ( wormGraph2[1], wormGraph2[#wormGraph2], wormGraph2, false, valid_node_func2 )
 		if path then
 			for i, node in ipairs(path) do
-				Spring.Echo(node.id, node.x, node.y)
-				Spring.MarkerAddPoint(node.x, 100, node.y, node.id)
+				Spring.MarkerAddPoint(node.x, 100, node.y, i)
 			end
 		else
 			Spring.Echo("no path")
