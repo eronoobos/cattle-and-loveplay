@@ -78,7 +78,7 @@ local sandUnitPosition = {}
 local numSandUnits = 0
 local totalSandMovement = 0
 local sandUnitValues = {} -- sandUnitValues[unitDefID] = value (the amount it attracts the worm
-local worm = {} -- x, z, tx, tz, vx, vz, nvx, nvz, signSecond, lastAttackSecond, endSecond, favoredSide
+local worm = {}
 local signFreqMin = wormSignFrequency / 2 -- the minimum pause between worm signs
 local signFreqMax = wormSignFrequency + signFreqMin -- maximum pause between worm signs
 local gaiaTeam -- which team is gaia? (set in Initialize())
@@ -225,12 +225,13 @@ local function getSandUnitValues()
 	middle = middle ^ 0.3
 	-- Spring.Echo(highest, lowest, range, average, middle)
 	for uDefID, uDef in pairs(UnitDefs) do
-		if uDef.extractsMetal > 0 then
-			vals[uDefID] = mexValue
-		elseif uDef.canHover then
-			vals[uDefID] = hoverValue
-		elseif string.find(string.lower(uDef.name), "commander") then
+		if uDef.showPlayerName then --string.find(string.lower(uDef.humanName), "commander") then
+			-- Spring.Echo(uDef.name, uDef.humanName, "is commander")
 			vals[uDefID] = commanderValue
+		elseif uDef.extractsMetal > 0 then
+			vals[uDefID] = mexValue
+		elseif uDef.moveDef and uDef.moveDef.family == "hover" then
+			vals[uDefID] = hoverValue
 		else
 			local cost = math.floor( uDef.metalCost + (uDef.energyCost / 50) )
 			local fract = (cost - lowest) / range
@@ -341,6 +342,18 @@ local function nearestRock(x, z, minDist, maxDist)
 	return x, z
 end
 
+local function inWormMouth(x, z)
+	for uID, wID in pairs(isEmergedWorm) do
+		local w = worm[wID]
+		if w then
+			local d = DistanceXZ(x, z, w.x, w.z)
+			if d < w.size.radius then
+				return w
+			end
+		end
+	end
+end
+
 local function getWormSizes(sizesByUnitName)
 	local sizes = {}
 	for unitName, s in pairs(sizesByUnitName) do
@@ -424,16 +437,16 @@ local function giveTargetToWorms(uID, uSize, uval, ux, uz, dx, dz)
 					-- Spring.Echo(cura, testa, adist)
 					if math.abs(adist) > halfPi then
 						w.tx, w.tz = ux, uz
-						Spring.Echo("adist above halfpi, using ux, uz")
+						-- Spring.Echo("adist above halfpi, using ux, uz")
 					elseif math.abs(adist) > quarterPi then
 						local fortyFive = quarterPi
 						if adist < 0 then fortyFive = -quarterPi end
 						local newa = AngleAdd(cura, fortyFive)
 						w.tx, w.tz = CirclePos(w.x, w.z, dist, AngleAdd(cura, fortyFive))
-						Spring.Echo("adist above quarterpi", fortyFive, newa)
+						-- Spring.Echo("adist above quarterpi", fortyFive, newa)
 					else
 						w.tx, w.tz = CirclePos(w.x, w.z, dist, testa)
-						Spring.Echo("adist below quarterpi, using testa")
+						-- Spring.Echo("adist below quarterpi, using testa")
 					end
 					-- w.tx, w.tz = ux, uz
 				end
@@ -800,7 +813,7 @@ local function wormDirect(w)
 	local tz = w.tz
 	local r = w.size.radius
 	if tx < x + r and tx > x - r and tz < z + r and tz > z - r then
-		Spring.Echo("target near position.")
+		-- Spring.Echo("target near position.")
 		local distx = tx - x
 		local distz = tz - z
 		w.vx, w.vz = normalizeVector(distx, distz)
@@ -826,7 +839,7 @@ local function wormDirect(w)
 				end
 			end
 		else
-			Spring.Echo("no nodes", w.x, w.z, w.tx, w.tz, startNode, goalNode)
+			-- Spring.Echo("no nodes", w.x, w.z, w.tx, w.tz, startNode, goalNode)
 			w.vx = 1 - (2*mRandom())
 			w.vz = 1 - (2*mRandom())
 			w.vx, w.vz = normalizeVector(w.vx, w.vz)
@@ -1125,7 +1138,7 @@ function gadget:GameFrame(gf)
 	for wID, w in pairs(worm) do
 		if not w.tx then
 			-- if no target then make a random target
-			Spring.Echo("no target, using random target")
+			-- Spring.Echo("no target, using random target")
 			local tx, tz = nearestSand(mRandom(halfCellSize, sizeX-halfCellSize), mRandom(halfCellSize, sizeZ-halfCellSize))
 			w.tx = tx
 			w.tz = tz
@@ -1177,9 +1190,8 @@ function gadget:GameFrame(gf)
 				if bestID then
 					w.signSecond = second + 1 -- for ground ripples
 					wormAttack(bestID, wID)
-					w.lastAttackSecond = second
 					alreadyAttacked[bestID] = true
-					w.bellyCount = w.bellyCount + 1
+					-- w.bellyCount = w.bellyCount + 1
 					-- Spring.Echo(w.bellyCount, wormBellyLimit, w.endSecond)
 				end
 			end
@@ -1237,7 +1249,7 @@ function gadget:UnitDestroyed(unitID, unitDefID, teamID, attackerID, attackerDef
 		numSandUnits = numSandUnits - 1
 --		SendToUnsynced("passSandUnit", uID, nil)
 	end
-	
+
 	-- remove from emerged worms to allow worm to attack again
 	local wID = isEmergedWorm[unitID]
 	if wID then
@@ -1252,6 +1264,13 @@ function gadget:UnitDestroyed(unitID, unitDefID, teamID, attackerID, attackerDef
 				-- worm appatite whetted
 				w.endSecond = Spring.GetGameSeconds() + baseWormDuration
 			end
+		end
+	else
+		local ux, uy, uz = Spring.GetUnitPosition(unitID)
+		local w = inWormMouth(ux, uz)
+		if w then
+			-- Spring.Echo("unit died in my belly")
+			w.bellyCount = w.bellyCount + 1
 		end
 	end
 end
