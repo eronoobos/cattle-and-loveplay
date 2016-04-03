@@ -198,7 +198,7 @@ local function convertWormReDir(reDir, cellsWide)
 			end
 		end
 	end
-	Spring.Echo(halfWidth, width, width + halfWidth)
+	-- Spring.Echo(halfWidth, width, width + halfWidth)
 	return graph
 end
 
@@ -223,7 +223,7 @@ local function getSandUnitValues()
 	local average = sum / num
 	local middle = (average - lowest) / range
 	middle = middle ^ 0.3
-	Spring.Echo(highest, lowest, range, average, middle)
+	-- Spring.Echo(highest, lowest, range, average, middle)
 	for uDefID, uDef in pairs(UnitDefs) do
 		if uDef.extractsMetal > 0 then
 			vals[uDefID] = mexValue
@@ -289,7 +289,7 @@ local function nodeHere(x, z, graph, nodeWidth)
 	x, z = mapClampXZ(x, z)
 	local nx = (x - (x % nodeWidth)) + math.ceil(nodeWidth/2)
 	local nz = (z - (z % nodeWidth)) + math.ceil(nodeWidth/2)
-	local node = astar.find_node(nx, nz, graph)
+	local node = astar.find_node(nx, nz, graph) or astar.nearest_node(nx, nz, graph)
 	-- Spring.Echo(x, z, nx, nz, nodeWidth, math.ceil(nodeWidth/2), node)
 	return node
 end
@@ -395,12 +395,12 @@ local function giveTargetToWorms(uID, uSize, uval, ux, uz, dx, dz)
 			local distx = math.abs(ux - x)
 			local distz = math.abs(uz - z)
 			local dist = math.sqrt((distx*distx) + (distz*distz))
-			local velx, vely, velz, velLength = Spring.GetUnitVelocity(uID)
+			-- local velx, vely, velz, velLength = Spring.GetUnitVelocity(uID)
 			-- Spring.Echo(velx, vely, velz, velLength)
-			local pvelx = dx / evalFrequency
-			local pvelz = dz / evalFrequency
-			velx = (velx + pvelx) / 2
-			velz = (velz + pvelz) / 2
+			local velx = dx / evalFrequency
+			local velz = dz / evalFrequency
+			-- velx = (velx + pvelx) / 2
+			-- velz = (velz + pvelz) / 2
 			local velmult = dist/w.speed
 			local farx = ux + (velx * velmult)
 			local farz = uz + (velz * velmult)
@@ -415,7 +415,7 @@ local function giveTargetToWorms(uID, uSize, uval, ux, uz, dx, dz)
 					local jz = (mRandom() * j * 2) - j
 					w.tx, w.tz = nearestSand(ux + jx, uz + jz)
 				else
-					local veltestmult = velmult / 1.5
+					local veltestmult = velmult / 2
 					local testx = ux + (velx * veltestmult)
 					local testz = uz + (velz * veltestmult)
 					local testa = AngleXYXY(w.x, w.z, testx, testz)
@@ -424,17 +424,18 @@ local function giveTargetToWorms(uID, uSize, uval, ux, uz, dx, dz)
 					-- Spring.Echo(cura, testa, adist)
 					if math.abs(adist) > halfPi then
 						w.tx, w.tz = ux, uz
-						-- Spring.Echo("adist above halfpi, using ux, uz")
+						Spring.Echo("adist above halfpi, using ux, uz")
 					elseif math.abs(adist) > quarterPi then
 						local fortyFive = quarterPi
 						if adist < 0 then fortyFive = -quarterPi end
 						local newa = AngleAdd(cura, fortyFive)
 						w.tx, w.tz = CirclePos(w.x, w.z, dist, AngleAdd(cura, fortyFive))
-						-- Spring.Echo("adist above quarterpi", fortyFive, newa)
+						Spring.Echo("adist above quarterpi", fortyFive, newa)
 					else
 						w.tx, w.tz = CirclePos(w.x, w.z, dist, testa)
-						-- Spring.Echo("adist below quarterpi, using testa")
+						Spring.Echo("adist below quarterpi, using testa")
 					end
+					-- w.tx, w.tz = ux, uz
 				end
 				w.bestDist = fardist - uval
 				w.targetUnitID = uID
@@ -799,23 +800,31 @@ local function wormDirect(w)
 	local tz = w.tz
 	local r = w.size.radius
 	if tx < x + r and tx > x - r and tz < z + r and tz > z - r then
-		Spring.Echo(wID, "target near position. using random vector and removing target")
-		w.vx = 1 - (2*mRandom())
-		w.vz = 1 - (2*mRandom())
-		w.vx, w.vz = normalizeVector(w.vx, w.vz)
-		w.tx = nil
-		w.tz = nil
+		Spring.Echo("target near position.")
+		local distx = tx - x
+		local distz = tz - z
+		w.vx, w.vz = normalizeVector(distx, distz)
 		return
 	end
-	if not w.path or DistanceXZ(w.tx, w.tz, w.path[#w.path].x, w.path[#w.path].y) > w.size.nodeRadius then
+	if not w.path or (w.xPathed ~= w.tx and w.zPathed ~= w.tz) then -- DistanceXZ(w.tx, w.tz, w.path[#w.path].x, w.path[#w.path].y) > w.size.nodeRadius then
 		-- create new path
 		local graph = w.size.wormGraph
 		local startNode = nodeHere(w.x, w.z, graph, w.size.nodeWidth) or w.targetNode
-		local goalNode = nodeHere(w.tx, w.tz, graph, w.size.nodeWidth) or w.path[#w.path]
+		local goalNode = nodeHere(w.tx, w.tz, graph, w.size.nodeWidth)
 		if startNode and goalNode and startNode ~= goalNode then
 			w.path = astar.path(startNode, goalNode, graph, false, w.size.valid_node_func)
 			w.pathStep = 2
 			w.targetNode = w.path[2]
+			w.xPathed, w.zPathed = w.tx, w.tz
+			w.clearShot = true
+			for i, node in ipairs(w.path) do
+				if i > 1 and i < #w.path and #node.neighbors < 8 then
+					-- node has rocks near it
+					-- Spring.Echo("path has rocks")
+					w.clearShot = false
+					break
+				end
+			end
 		else
 			Spring.Echo("no nodes", w.x, w.z, w.tx, w.tz, startNode, goalNode)
 			w.vx = 1 - (2*mRandom())
@@ -839,7 +848,12 @@ local function wormDirect(w)
 		end
 	end
 	if w.targetNode then
-		tx, tz = w.targetNode.x, w.targetNode.y
+		if w.clearShot then
+			-- go straight to target along unobstructed path
+			tx, tz = w.tx, w.tz
+		else
+			tx, tz = w.targetNode.x, w.targetNode.y
+		end
 	end
 	local distx = tx - x
 	local distz = tz - z
@@ -903,6 +917,10 @@ local function wormSpawn(x, z)
 			range = range,
 			size = wormSizes[size],
 		}
+		if box then
+			-- go straight for it before first eval cycle
+			w.tx, w.tz = box.x, box.z
+		end
 		worm[wID] = w
 		wormBigSign(w)
 		-- Spring.Echo(speed, range)
@@ -1107,6 +1125,7 @@ function gadget:GameFrame(gf)
 	for wID, w in pairs(worm) do
 		if not w.tx then
 			-- if no target then make a random target
+			Spring.Echo("no target, using random target")
 			local tx, tz = nearestSand(mRandom(halfCellSize, sizeX-halfCellSize), mRandom(halfCellSize, sizeZ-halfCellSize))
 			w.tx = tx
 			w.tz = tz
