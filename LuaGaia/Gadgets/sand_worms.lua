@@ -54,6 +54,7 @@ local signEvalFrequency = 12 -- game frames between parts of a wormsign volley (
 local attackEvalFrequency = 30 -- game frames between attacking units in range of worm under sand
 
 -- storage variables
+local astar = {}
 local valid_node_func2
 local valid_node_func4
 local wormGraph2 = {}
@@ -106,6 +107,10 @@ local halfPi = math.pi / 2
 local quarterPi = math.pi / 4
 
 -- functions
+
+local function DistanceXZ(x1, z1, x2, z2)
+	return math.sqrt( (x2-x1)^2 + (z2-z1)^2 )
+end
 
 -- y is not random, but zero
 local function randomXYZ()
@@ -184,8 +189,8 @@ local function convertWormReDir(reDir, cellsWide)
 			end
 			if sand then
 				local node = {
-					x = x+halfWidth,
-					y = z+halfWidth,
+					x = x + halfWidth,
+					y = z + halfWidth,
 					id = id,
 				}
 				table.insert(graph, node)
@@ -193,6 +198,7 @@ local function convertWormReDir(reDir, cellsWide)
 			end
 		end
 	end
+	Spring.Echo(halfWidth, width, width + halfWidth)
 	return graph
 end
 
@@ -279,6 +285,15 @@ local function mapClampXZ(x, z)
 	return mapClampX(x), mapClampZ(z)
 end
 
+local function nodeHere(x, z, graph, nodeWidth)
+	x, z = mapClampXZ(x, z)
+	local nx = (x - (x % nodeWidth)) + math.ceil(nodeWidth/2)
+	local nz = (z - (z % nodeWidth)) + math.ceil(nodeWidth/2)
+	local node = astar.find_node(nx, nz, graph)
+	-- Spring.Echo(x, z, nx, nz, nodeWidth, math.ceil(nodeWidth/2), node)
+	return node
+end
+
 local function nearestSand(ix, iz)
 	-- also clamps to map bounds
 	local x = math.max(math.min(ix, sizeX-halfCellSize), halfCellSize)
@@ -331,7 +346,17 @@ local function getWormSizes(sizesByUnitName)
 	for unitName, s in pairs(sizesByUnitName) do
 		local uDef = UnitDefNames[unitName]
 		local bulgeStamp = createFullBulgeStamp(math.ceil(uDef.radius / 8))
-		local size = { radius = uDef.radius, diameter = uDef.radius * 2, maxMealSize = math.ceil(uDef.radius * 0.888), bulgeStamp = bulgeStamp, rippleHeight = uDef.radius / 20, bulgeHeight = uDef.radius / 120, unitName = unitName, badTargets = {} }
+		local nodeWidth = 128
+		local wormGraph = wormGraph2
+		local valid_node_func = valid_node_func2
+		if uDef.radius > 100 then
+			nodeWidth = 256
+			wormGraph = wormGraph4
+			valid_node_func = valid_node_func4
+		end
+		local nodeHalfWidth = nodeWidth / 2
+		local nodeRadius = math.ceil( math.sqrt((nodeHalfWidth^2)*2) )
+		local size = { radius = uDef.radius, diameter = uDef.radius * 2, maxMealSize = math.ceil(uDef.radius * 0.888), bulgeStamp = bulgeStamp, rippleHeight = uDef.radius / 20, bulgeHeight = uDef.radius / 120, unitName = unitName, badTargets = {}, wormGraph = wormGraph, valid_node_func = valid_node_func, nodeWidth = nodeWidth, nodeHalfWidth = nodeHalfWidth, nodeRadius = nodeRadius }
 		sizes[s] = size
 	end
 	return sizes
@@ -767,126 +792,58 @@ local function normalizeVector(vx, vz)
 	return vx, vz
 end
 
-local function dynamicAvoidRockVector(w)
-	local x, z, vx, vz = w.x, w.z, w.vx, w.vz
-	local evalDist = math.ceil((evalFrequency * w.speed) + w.size.radius)
-	local blockDist = -1
-	for far=16, evalDist, 16 do
-		local nx = x + (vx*far)
-		local nz = z + (vz*far)
-		local groundType, _ = Spring.GetGroundInfo(nx, nz)
-		if groundType ~= sandType or nx > sizeX or nz > sizeZ or nx < 0 or nz < 0  then
-			blockDist = far
-			break
-		end
-	end
-	if blockDist == -1 then
-		return vx, vz
-	else
-		local blockTestDist = blockDist + w.size.radius
-		-- two perpendicular vectors
-		local pvx = { -vz, vz }
-		local pvz = { vx, -vx }
-		local sandMult = { 2, 2 }
-		local vStart = 1
-		local vEnd = 2
-		if w.favoredSide then
-			vStart = w.favoredSide
-			vEnd = w.favoredSide
-		end
-		for v=vStart, vEnd do
-			for m=0.1, 1, 0.1 do
-				local mr = 1 - m
-				local mvx = (mr * vx) + (m * pvx[v])
-				local mvz = (mr * vz) + (m * pvz[v])
-				local tx = x + (mvx*blockTestDist)
-				local tz = z + (mvz*blockTestDist)
-				local gt, _ = Spring.GetGroundInfo(tx, tz)
-				if gt == sandType then
-					sandMult[v] = m
-					break
-				end
-			end
-		end
-		local noMultMult = false
-		local vBest = 1
-		if sandMult[2] < sandMult[1] then
-			vBest = 2
-		elseif sandMult[1] == 2 and sandMult[2] == 2 then
-			vx = -vx
-			vz = -vz
-			local revSandMult = { -1, -1 }
-			local vStart = 1
-			local vEnd = 2
-			if w.favoredSide then
-				vStart = w.favoredSide
-				vEnd = w.favoredSide
-			end
-			for v=vStart, vEnd do
-				for m=1, 0.1, -0.1 do
-					local mr = 1 - m
-					local mvx = (mr * vx) + (m * pvx[v])
-					local mvz = (mr * vz) + (m * pvz[v])
-					local tx = x + (mvx*blockTestDist)
-					local tz = z + (mvz*blockTestDist)
-					local gt, _ = Spring.GetGroundInfo(tx, tz)
-					if gt == sandType then
-						revSandMult[v] = m
-						break
-					end
-				end
-			end
-			if revSandMult[2] > revSandMult[1] then
-				vBest = 2
-			end
-			sandMult = revSandMult
-			noMultMult = true
-		end
-		if w.favoredSide then vBest = w.favoredSide end
-		local multMult = 1 - ((blockTestDist-16) / evalDist)
-		if noMultMult then
-			multMult = 1
-		end
-		local vMult = sandMult[vBest] * multMult
-		local vMultRemain = 1 - vMult
-		local nvx = (vMultRemain * vx) + (vMult * pvx[vBest])
-		local nvz = (vMultRemain * vz) + (vMult * pvz[vBest])
-		if noMultMult then
-			w.vx = nvx
-			w.vz = nvz
-		end
-		if not w.favoredSide then w.favoredSide = vBest end
-		return normalizeVector(nvx, nvz)
-	end
-end
-
 local function wormDirect(w)
 	local x = w.x
 	local z = w.z
-	if not w.tx then
---		Spring.Echo(wID, "no target. using random vector")
-		w.vx = 1 - (2*mRandom())
-		w.vz = 1 - (2*mRandom())
-		return
-	end
 	local tx = w.tx
 	local tz = w.tz
-	if tx < x + 32 and tx > x - 32 and tz < z + 32 and tz > z - 32 then
---		Spring.Echo(wID, "target near position. using random vector and removing target")
+	local r = w.size.radius
+	if tx < x + r and tx > x - r and tz < z + r and tz > z - r then
+		Spring.Echo(wID, "target near position. using random vector and removing target")
 		w.vx = 1 - (2*mRandom())
 		w.vz = 1 - (2*mRandom())
+		w.vx, w.vz = normalizeVector(w.vx, w.vz)
 		w.tx = nil
 		w.tz = nil
 		return
 	end
---	Spring.Echo(wID, "calculating vector")
+	if not w.path or DistanceXZ(w.tx, w.tz, w.path[#w.path].x, w.path[#w.path].y) > w.size.nodeRadius then
+		-- create new path
+		local graph = w.size.wormGraph
+		local startNode = nodeHere(w.x, w.z, graph, w.size.nodeWidth) or w.targetNode
+		local goalNode = nodeHere(w.tx, w.tz, graph, w.size.nodeWidth) or w.path[#w.path]
+		if startNode and goalNode and startNode ~= goalNode then
+			w.path = astar.path(startNode, goalNode, graph, false, w.size.valid_node_func)
+			w.pathStep = 2
+			w.targetNode = w.path[2]
+		else
+			Spring.Echo("no nodes", w.x, w.z, w.tx, w.tz, startNode, goalNode)
+			w.vx = 1 - (2*mRandom())
+			w.vz = 1 - (2*mRandom())
+			w.vx, w.vz = normalizeVector(w.vx, w.vz)
+			w.tx = nil
+			w.tz = nil
+			return
+		end
+	end 
+	local nx, nz = w.targetNode.x, w.targetNode.y
+	if nx < x + r and nx > x - r and nz < z + r and nz > z - r then
+		if w.pathStep + 1 > #w.path then
+			-- last node, therefore near target
+			-- Spring.Echo("last node")
+		else
+			-- go to next node on path
+			w.pathStep = w.pathStep + 1
+			w.targetNode = w.path[w.pathStep]
+			-- Spring.Echo("next node", w.pathStep, tx, tz)
+		end
+	end
+	if w.targetNode then
+		tx, tz = w.targetNode.x, w.targetNode.y
+	end
 	local distx = tx - x
 	local distz = tz - z
-	local vx, vz = normalizeVector(distx, distz)
-	w.vx = vx
-	w.vz = vz
---	Spring.MarkerAddPoint(tx, 100, tz, wID)
---	Spring.MarkerErasePosition(tx, 100, tz)
+	w.vx, w.vz = normalizeVector(distx, distz)
 end
 
 local function passWormSign(x, z)
@@ -1003,8 +960,6 @@ end
 -- synced
 if gadgetHandler:IsSyncedCode() then
 
-local astar = {}
-
 function gadget:Initialize()
 	local mapOptions = Spring.GetMapOptions()
 	if mapOptions then
@@ -1023,7 +978,6 @@ function gadget:Initialize()
 		gadgetHandler:RemoveGadget()
 		return
 	end
-	wormSizes = getWormSizes(wormUnits)
 	sandUnitValues = getSandUnitValues()
 	gaiaTeam = Spring.GetGaiaTeamID()
 	wormReDir = loadWormReDir()
@@ -1042,6 +996,7 @@ function gadget:Initialize()
 		end
 		return false
 	end
+	wormSizes = getWormSizes(wormUnits)
 	rippleExpand = createRippleExpansionMap()
 	initializeRippleMap()
 	nextPotentialEvent = Spring.GetGameSeconds() + wormEventFrequency
@@ -1067,10 +1022,9 @@ function gadget:GameFrame(gf)
 	-- worm movement and ripple sign
 	for wID, w in pairs(worm) do
 		if w.vx and not w.emergedID then
-			w.nvx, w.nvz = dynamicAvoidRockVector(w)
-			w.x = mapClampX(w.x + (w.nvx*w.speed))
-			w.z = mapClampZ(w.z + (w.nvz*w.speed))
-			-- SendToUnsynced("passWorm", wID, w.x, w.z, w.vx, w.vz, w.nvx, w.nvz, w.tx, w.tz, w.signSecond, w.endSecond ) --uncomment this to show the worms positions, vectors, and targets real time (uses gui_worm_debug.lua)
+			w.x = mapClampX(w.x + (w.vx*w.speed))
+			w.z = mapClampZ(w.z + (w.vz*w.speed))
+			SendToUnsynced("passWorm", wID, w.x, w.z, w.vx, w.vz, w.vx, w.vz, w.tx, w.tz, w.signSecond, w.endSecond ) --uncomment this to show the worms positions, vectors, and targets real time (uses gui_worm_debug.lua)
 		end
 		-- if not w.emergedID then
 			-- signStamp(w)
@@ -1147,17 +1101,17 @@ function gadget:GameFrame(gf)
 			end
 			nextPotentialEvent = second + wormEventFrequency
 		end
-		
-		-- calculate vectors
-		for wID, w in pairs(worm) do
-			if not w.tx then
-				-- if no target then make a random target
-				local tx, tz = nearestSand(mRandom(halfCellSize, sizeX-halfCellSize), mRandom(halfCellSize, sizeZ-halfCellSize))
-				w.tx = tx
-				w.tz = tz
-			end
-			wormDirect(w)
+	end
+
+	-- calculate vectors
+	for wID, w in pairs(worm) do
+		if not w.tx then
+			-- if no target then make a random target
+			local tx, tz = nearestSand(mRandom(halfCellSize, sizeX-halfCellSize), mRandom(halfCellSize, sizeZ-halfCellSize))
+			w.tx = tx
+			w.tz = tz
 		end
+		wormDirect(w)
 	end
 
 	if numSandUnits > 0 then
@@ -1241,14 +1195,14 @@ end
 function gadget:UnitCreated(unitID, unitDefID, unitTeam, builderID)
 	local uDef = UnitDefs[unitDefID]
 	if uDef.name == "wormtrigger" then
-		local path = astar.path ( wormGraph2[1], wormGraph2[#wormGraph2], wormGraph2, false, valid_node_func2 )
-		if path then
-			for i, node in ipairs(path) do
-				Spring.MarkerAddPoint(node.x, 100, node.y, i)
-			end
-		else
-			Spring.Echo("no path")
-		end
+		-- local path = astar.path ( wormGraph2[1], wormGraph2[#wormGraph2], wormGraph2, false, valid_node_func2 )
+		-- if path then
+		-- 	for i, node in ipairs(path) do
+		-- 		Spring.MarkerAddPoint(node.x, 100, node.y, i)
+		-- 	end
+		-- else
+		-- 	Spring.Echo("no path")
+		-- end
 		local x, y, z = Spring.GetUnitPosition(unitID)
 		wormSpawn(x, z) -- to make testing easier
 		Spring.DestroyUnit(unitID, false, true)
