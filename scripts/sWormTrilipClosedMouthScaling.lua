@@ -248,7 +248,7 @@ function script.Create()
 	maxMealSize = math.ceil(uDef.radius) * 0.888
 	-- maxMealSize = mCeil(0.6 * (uDef.height * uDef.radius))
 	doomRadius = mFloor(modelRadius * 1.8)
-	Spring.Echo("sworm created", modelHeight, modelRadius, maxMealSize, doomRadius)
+	-- Spring.Echo("sworm created", modelHeight, modelRadius, maxMealSize, doomRadius)
 	SetWormColVols()
 	local x,y,z = Spring.GetUnitPosition(unitID)
 

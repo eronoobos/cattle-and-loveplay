@@ -54,11 +54,11 @@ local signEvalFrequency = 12 -- game frames between parts of a wormsign volley (
 local attackEvalFrequency = 30 -- game frames between attacking units in range of worm under sand
 
 -- storage variables
-local astar = {}
-local valid_node_func2
-local valid_node_func4
-local wormGraph2 = {}
-local wormGraph4 = {}
+local astar = {} -- for later inclusion of the astar module
+local nodeDist2, nodeDist4
+local valid_node_func2, valid_node_func4
+local wormGraph2 = {} -- 2x2 reDir cells make up each graph node
+local wormGraph4 = {} -- 4x4 reDir cells make up each graph node
 local excludeUnits = {}
 local newRipples = {}
 local oldStamps = {}
@@ -200,6 +200,26 @@ local function convertWormReDir(reDir, cellsWide)
 	end
 	-- Spring.Echo(halfWidth, width, width + halfWidth)
 	return graph
+end
+
+local function initializeAStar()
+	wormGraph2 = convertWormReDir(wormReDir, 2)
+	wormGraph4 = convertWormReDir(wormReDir, 4)
+	astar = VFS.Include('a-star-lua/a-star.lua')
+	nodeDist2 = (((cellSize*2)^2) * 2) + 1
+	nodeDist4 = (((cellSize*4)^2) * 2) + 1
+	valid_node_func2 = function ( node, neighbor ) 
+		if astar.distance( node.x, node.y, neighbor.x, neighbor.y) < nodeDist2 then
+			return true
+		end
+		return false
+	end
+	valid_node_func4 = function ( node, neighbor ) 
+		if astar.distance( node.x, node.y, neighbor.x, neighbor.y) < nodeDist4 then
+			return true
+		end
+		return false
+	end
 end
 
 local function getSandUnitValues()
@@ -1002,7 +1022,7 @@ function gadget:Initialize()
 		if mapOptions.sworm_worm_speed then wormSpeed = tonumber(mapOptions.sworm_worm_speed) end
 		if mapOptions.sworm_eat_mex == "1" then wormEatMex = true end
 		if mapOptions.sworm_eat_commander == "1" then wormEatCommander = true end
-		SendToUnsynced("passWormInit", evalFrequency, wormSpeed, 65) -- uncomment for showing worm positions with debug widget
+		-- SendToUnsynced("passWormInit", evalFrequency, wormSpeed, 65) -- uncomment for showing worm positions with debug widget
 	end
 	if not areWorms then
 		Spring.Echo("Sand worms are not enabled. Sand worm gadget disabled.")
@@ -1012,21 +1032,7 @@ function gadget:Initialize()
 	sandUnitValues = getSandUnitValues()
 	gaiaTeam = Spring.GetGaiaTeamID()
 	wormReDir = loadWormReDir()
-	wormGraph2 = convertWormReDir(wormReDir, 2)
-	wormGraph4 = convertWormReDir(wormReDir, 4)
-	astar = VFS.Include('a-star-lua/a-star.lua')
-	valid_node_func2 = function ( node, neighbor ) 
-		if astar.distance( node.x, node.y, neighbor.x, neighbor.y) < 32769 then
-			return true
-		end
-		return false
-	end
-	valid_node_func4 = function ( node, neighbor ) 
-		if astar.distance( node.x, node.y, neighbor.x, neighbor.y) < 131073 then
-			return true
-		end
-		return false
-	end
+	initializeAStar()
 	wormSizes = getWormSizes(wormUnits)
 	rippleExpand = createRippleExpansionMap()
 	initializeRippleMap()
@@ -1055,7 +1061,7 @@ function gadget:GameFrame(gf)
 		if w.vx and not w.emergedID then
 			w.x = mapClampX(w.x + (w.vx*w.speed))
 			w.z = mapClampZ(w.z + (w.vz*w.speed))
-			SendToUnsynced("passWorm", wID, w.x, w.z, w.vx, w.vz, w.vx, w.vz, w.tx, w.tz, w.signSecond, w.endSecond ) --uncomment this to show the worms positions, vectors, and targets real time (uses gui_worm_debug.lua)
+			-- SendToUnsynced("passWorm", wID, w.x, w.z, w.vx, w.vz, w.vx, w.vz, w.tx, w.tz, w.signSecond, w.endSecond ) --uncomment this to show the worms positions, vectors, and targets real time (uses gui_worm_debug.lua)
 		end
 		-- if not w.emergedID then
 			-- signStamp(w)
@@ -1226,14 +1232,6 @@ end
 function gadget:UnitCreated(unitID, unitDefID, unitTeam, builderID)
 	local uDef = UnitDefs[unitDefID]
 	if uDef.name == "wormtrigger" then
-		-- local path = astar.path ( wormGraph2[1], wormGraph2[#wormGraph2], wormGraph2, false, valid_node_func2 )
-		-- if path then
-		-- 	for i, node in ipairs(path) do
-		-- 		Spring.MarkerAddPoint(node.x, 100, node.y, i)
-		-- 	end
-		-- else
-		-- 	Spring.Echo("no path")
-		-- end
 		local x, y, z = Spring.GetUnitPosition(unitID)
 		wormSpawn(x, z) -- to make testing easier
 		Spring.DestroyUnit(unitID, false, true)

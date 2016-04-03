@@ -228,8 +228,8 @@ v6 -> v7
 - / emerge at least the worm's radius and a bit more from the rock
 - / limit bites to 3 or 4, and shatter multiple pieces at once if necessary
 - / use astar instead of dynamicrockavoid (keep worms from moving too near to the rock) see https://github.com/GloryFish/lua-astar/
+- / fix broken unit icons
 - make cegs and height ripples show how large the worm is, yet not have the height ripples look like crap when large
-- fix broken unit icons
 - classify worm sizes by sounds used
 - rebalance sound volumes in playback
 - optimize all Spring and math functions
