@@ -231,8 +231,8 @@ v6 -> v7
 - / fix broken unit icons
 - / prevent worms from eating units, by passing unitdefids and unitids from the gadget
 - / use native radar instead of widget radar? by making an invisible unit move around the map as the underground worm?
-- make cegs and height ripples show how large the worm is, yet not have the height ripples look like crap when large
-- rebalance sound volumes in playback
+- / maybe only emerged worm should be attackable?
+- / silence weapon fire of unit being eaten
 - optimize all Spring and math functions
 - delete unecessary sounds and images
 - classify worm sizes by sounds used?

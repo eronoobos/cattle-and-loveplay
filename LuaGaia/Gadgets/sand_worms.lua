@@ -647,7 +647,7 @@ local function wormBigSign(w)
 	local maxArc = math.ceil(w.size.radius * 10)
 	signArcLightning( sx, sz, mRandom(minArc,maxArc), 1+mRandom(), 32, "WORMSIGN_LIGHTNING", "WORMSIGN_FLASH" )
 	local snd = thunderSnds[mRandom(#thunderSnds)]
-	Spring.PlaySoundFile(snd,1.0,sx,sy,sz)
+	Spring.PlaySoundFile(snd,0.5,sx,sy,sz)
 end
 
 local function wormMediumSign(w)
@@ -660,7 +660,7 @@ local function wormMediumSign(w)
 		signArcLightning( sx, sz, mRandom(minArc,maxArc), mRandom(1,3), 24 )
 	end
 	local snd = lightningSnds[mRandom(#lightningSnds)]
-	Spring.PlaySoundFile(snd,0.33,sx,sy,sz)
+	Spring.PlaySoundFile(snd,0.1,sx,sy,sz)
 end
 
 local function wormLittleSign(w, sx, sz)
@@ -680,7 +680,7 @@ local function wormLittleSign(w, sx, sz)
 		signArcLightning( sx, sz, mRandom(minArc, maxArc), mRandom(2,5) )
 	end
 	local snd = lightningSnds[mRandom(#lightningSnds)]
-	Spring.PlaySoundFile(snd,0.25,sx,sy,sz)
+	Spring.PlaySoundFile(snd,0.1,sx,sy,sz)
 end
 
 local function initializeRippleMap()
@@ -1273,7 +1273,7 @@ function gadget:GameFrame(gf)
 				if not w.hasQuaked and second > w.signSecond - 4 then
 					local y = Spring.GetGroundHeight(w.x, w.z)
 					local snd = quakeSnds[mRandom(#quakeSnds)]
-					Spring.PlaySoundFile(snd,1.0,w.x,y,w.z)
+					Spring.PlaySoundFile(snd,1.5,w.x,y,w.z)
 					w.hasQuaked = true
 				end
 				if second > w.signSecond + 3 then

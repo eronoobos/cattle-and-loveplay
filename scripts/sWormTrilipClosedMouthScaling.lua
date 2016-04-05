@@ -101,6 +101,17 @@ local function MuchDirt(x, y, z, dirtnum, sleepbetween, randradius)
 	end
 end
 
+local function ToyWith(uID)
+	Spring.AddUnitImpulse(uID, math.random()*0.2-0.1, 1, math.random()*0.2-0.1)
+	-- Spring.SetUnitRotation(uID, 0, math.random(8)-4, 0)
+end
+
+local function GetUnitDef(uID)
+	local uDefID = Spring.GetUnitDefID(uID)
+	if not uDefID then return end
+	return UnitDefs[uDefID]
+end
+
 local function ComeToMe(uID, x, y, z)
 	local ux, uy, uz = Spring.GetUnitBasePosition(uID)
 	if not ux then return end
@@ -113,17 +124,12 @@ local function ComeToMe(uID, x, y, z)
 	-- Spring.Echo(uy, y, disty)
 	Spring.MoveCtrl.SetVelocity(uID, -distx/100, -disty/100, -distz/100)
 	Spring.MoveCtrl.SetRotationVelocity(uID, 0, math.random()*0.03-0.015, 0)
-end
-
-local function ToyWith(uID)
-	Spring.AddUnitImpulse(uID, math.random()*0.2-0.1, 1, math.random()*0.2-0.1)
-	-- Spring.SetUnitRotation(uID, 0, math.random(8)-4, 0)
-end
-
-local function GetUnitDef(uID)
-	local uDefID = Spring.GetUnitDefID(uID)
-	if not uDefID then return end
-	return UnitDefs[uDefID]
+	local uDef = GetUnitDef(uID)
+	Spring.Echo(#uDef.weapons)
+	for weaponID = 1, #uDef.weapons do
+		-- Spring.UnitWeaponHoldFire(uID, weaponID)
+		Spring.SetUnitWeaponState(uID, weaponID, {range=0})
+	end
 end
 
 local function Swallow(doomedByDist)
@@ -178,9 +184,9 @@ local function Swallow(doomedByDist)
 	-- WaitForMove(center,y_axis)
 	Jaws(80, 10)
 	Move(center, y_axis, modelHeight, mFloor(modelHeight*0.15))
-	Spring.PlaySoundFile("WmRoar2",1.0,x,y,z)
+	Spring.PlaySoundFile("WmRoar2",modelRadius/14,x,y,z)
 	MuchDirt(x, y, z, 2, 100)
-	Spring.PlaySoundFile("WmRoar1",1.0,x,y,z)
+	Spring.PlaySoundFile("WmRoar1",modelRadius/14,x,y,z)
 	MuchDirt(x, y, z, 2, 100)
 
 	-- Sleep(600)
@@ -203,7 +209,7 @@ local function Swallow(doomedByDist)
 	local bites = math.random(math.min(mostPieces,3), 4)
 	for b = 1, bites do
 		Jaws(20, 900)
-		Spring.PlaySoundFile("WmRoar3",1.0,x,y,z)
+		Spring.PlaySoundFile("WmRoar3",modelRadius/14,x,y,z)
 		MuchDirt(x, y, z, 5)
 		-- Spring.MoveCtrl.SetVelocity(diesFirstID, 0, 2, 0)
 		-- Spring.MoveCtrl.SetRotationVelocity(diesFirstID, math.random(2)-1, math.random(2)-1, math.random(2)-1)
@@ -228,16 +234,16 @@ local function Swallow(doomedByDist)
 						Spring.UnitScript.CallAsUnit(uID, Explode, pieceNumber, exploType)
 						Spring.UnitScript.CallAsUnit(uID, Hide, pieceNumber)
 					end
-					Spring.PlaySoundFile("WmCrunch1",1.0,x,y,z)
+					Spring.PlaySoundFile("WmCrunch1",modelRadius/16,x,y,z)
 					if #pieces == 0 then
 						Sleep(50)
-						Spring.PlaySoundFile("WmExplode3",1.0,x,y,z)
+						Spring.PlaySoundFile("WmExplode3",2.0,x,y,z)
 						Spring.DestroyUnit(uID, false, true)
 						MuchDirt(x, y, z, 5)
 						ate = true
 					else
 						Sleep(50)
-						Spring.PlaySoundFile("WmExplode2",1.0,x,y,z)
+						Spring.PlaySoundFile("WmExplode2",2.0,x,y,z)
 						MuchDirt(x, y, z, 3)
 					end
 				end
@@ -249,6 +255,7 @@ local function Swallow(doomedByDist)
 		end
 		MuchDirt(x, y, z, 10, 100)
 	end
+	Spring.PlaySoundFile("WmStampede",modelRadius/20,x,y,z)
 	Jaws(15, 2)
 	MuchDirt(x, y, z, 10, 200)
 end
@@ -267,7 +274,7 @@ function script.Create()
 
 	Turn(center,y_axis,math.rad(math.random(1,360)),180) -- start in a random rotation
 	Spin(center,y_axis,0.03,1) -- worm rotates slowly
-	Spring.PlaySoundFile("WmStampede",1.5,x,y,z)
+	Spring.PlaySoundFile("WmStampede",modelRadius/16,x,y,z)
 	MuchDirt(x, y, z, 5, 50)
 	-- Move(center,y_axis,20,30)
 	-- WaitForMove(center,y_axis)
@@ -309,7 +316,7 @@ function script.Create()
 		MuchDirt(x, y, z, 1, 100, modelRadius*0.5)
 	end
 	WaitForMove(center,y_axis)
-	Spring.PlaySoundFile("WmSandExplosion",2.0,x,y,z)
+	Spring.PlaySoundFile("WmSandExplosion",1.75,x,y,z)
 	Move(center, y_axis, 0, mCeil(modelHeight*0.05))
 	while true == Spring.UnitScript.IsInMove(center, y_axis) do --spawns cegs and turns the 4fth segmet until the Worm is underground 
 		MuchDirt(x, y, z, 1, 200, modelRadius*0.25)
