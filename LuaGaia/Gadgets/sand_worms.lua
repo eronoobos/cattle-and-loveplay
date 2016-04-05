@@ -154,6 +154,8 @@ local spGetGaiaTeamID = Spring.GetGaiaTeamID
 local spSetUnitStealth = Spring.SetUnitStealth
 local spSetUnitCloak = Spring.SetUnitCloak
 local spGetUnitsInSphere = Spring.GetUnitsInSphere
+local spGetSpectatingState = Spring.GetSpectatingState
+local spGiveOrderToUnit = Spring.GiveOrderToUnit
 
 -- localizations that must be set in Initialize
 local spMoveCtrlEnable
@@ -1093,13 +1095,15 @@ local function wormAttack(targetID, wID)
 	end
 	local unitTeam = spGetUnitTeam(targetID)
 	local attackerID = spCreateUnit(w.size.unitName, x, y, z, 0, gaiaTeam, false)
-	if w.underUnitID then spSetUnitHealth(attackerID, spGetUnitHealth(w.underUnitID)) end
+	if w.underUnitID then
+		spSetUnitHealth(attackerID, spGetUnitHealth(w.underUnitID))
+		spSetUnitStealth(w.underUnitID, true)
+		spGiveOrderToUnit(w.underUnitID, CMD.CLOAK, {1}, {})
+	end
 	isEmergedWorm[attackerID] = wID
 	w.emergedID = attackerID
 	w.x, w.z = x, z
 	w.vx, w.vz = 0, 0
-	spSetUnitStealth(w.underUnitID, true)
-	Spring.GiveOrderToUnit(w.underUnitID, CMD.CLOAK, {1}, {})
 end
 
 local function doWormMovementAndRipple(gf, second)
@@ -1316,7 +1320,7 @@ function gadget:GameFrame(gf)
 			wormMoveUnderUnit(w) -- catch up worm under unit to current worm position
 			if not w.emergedID and (not w.nextRadarToggle or gf >= w.nextRadarToggle) then
 				w.stealth = not w.stealth
-				spSetUnitStealth(w.underUnitID, w.stealth)
+				if w.underUnitID then spSetUnitStealth(w.underUnitID, w.stealth) end
 				w.nextRadarToggle = gf + mRandom(wormRadarFlashMin, wormRadarFlashMax)
 			end
 		end
@@ -1399,7 +1403,7 @@ function gadget:UnitDestroyed(unitID, unitDefID, teamID, attackerID, attackerDef
 				if w.underUnitID then
 					spSetUnitHealth(w.underUnitID, spGetUnitHealth(unitID))
 					spSetUnitStealth(w.underUnitID, false)
-					Spring.GiveOrderToUnit(w.underUnitID, CMD.CLOAK, {0}, {})
+					spGiveOrderToUnit(w.underUnitID, CMD.CLOAK, {0}, {})
 				end
 			end
 		end
