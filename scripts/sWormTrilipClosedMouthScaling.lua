@@ -198,11 +198,13 @@ local function Swallow(doomedByDist)
 	local piecesByID = {}
 	for _, uID in pairs(mealIDs) do
 		local pieces = Spring.GetUnitPieceList(uID)
-		if mostPieces < #pieces then mostPieces = #pieces end
 		piecesByID[uID] = pieces
-		Spring.MoveCtrl.SetVelocity(uID, 0, 0, 0)
-		Spring.MoveCtrl.SetRotationVelocity(uID, 0, 0, 0)
-		-- Spring.MoveCtrl.Disable(uID)
+		if pieces then
+			if mostPieces < #pieces then mostPieces = #pieces end
+			Spring.MoveCtrl.SetVelocity(uID, 0, 0, 0)
+			Spring.MoveCtrl.SetRotationVelocity(uID, 0, 0, 0)
+			-- Spring.MoveCtrl.Disable(uID)
+		end
 	end
 	-- Spring.Echo(mostPieces)
 	local bites = math.random(math.min(mostPieces,3), 4)
@@ -221,7 +223,7 @@ local function Swallow(doomedByDist)
 			if uHealth then
 				Spring.SetUnitHealth(uID, uHealth / 2)
 				local pieces = piecesByID[uID]
-				if #pieces > 0 then
+				if pieces and #pieces > 0 then
 					local piecesToEat = 1
 					if b == bites then piecesToEat = #pieces end
 					for i = 1, piecesToEat do
