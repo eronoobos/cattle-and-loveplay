@@ -1099,7 +1099,7 @@ local function wormAttack(targetID, wID)
 	w.x, w.z = x, z
 	w.vx, w.vz = 0, 0
 	spSetUnitStealth(w.underUnitID, true)
-	spSetUnitCloak(w.underUnitID, true)
+	Spring.GiveOrderToUnit(w.underUnitID, CMD.CLOAK, {1}, {})
 end
 
 local function doWormMovementAndRipple(gf, second)
@@ -1399,8 +1399,7 @@ function gadget:UnitDestroyed(unitID, unitDefID, teamID, attackerID, attackerDef
 				if w.underUnitID then
 					spSetUnitHealth(w.underUnitID, spGetUnitHealth(unitID))
 					spSetUnitStealth(w.underUnitID, false)
-					spSetUnitCloak(w.underUnitID, false)
-					spEcho(Spring.GetUnitIsCloaked(w.underUnitID))
+					Spring.GiveOrderToUnit(w.underUnitID, CMD.CLOAK, {0}, {})
 				end
 			end
 		end
