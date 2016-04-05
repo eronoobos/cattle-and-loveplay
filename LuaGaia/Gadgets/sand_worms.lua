@@ -892,6 +892,7 @@ end
 
 local function normalizeVector(vx, vz)
 	local dist = mSqrt( (vx^2) + (vz^2) )
+	if dist == 0 then return vx, vz end
 	vx = vx / dist
 	vz = vz / dist
 	return vx, vz
@@ -907,6 +908,12 @@ local function wormMoveUnderUnit(w)
 end
 
 local function wormDirect(w)
+	if not w.tx then
+		-- spEcho("no target, using random target")
+		local tx, tz = nearestSand(mRandom(halfCellSize, sizeX-halfCellSize), mRandom(halfCellSize, sizeZ-halfCellSize))
+		w.tx = tx
+		w.tz = tz
+	end
 	local x = w.x
 	local z = w.z
 	local tx = w.tx
@@ -1049,7 +1056,7 @@ local function wormSpawn(x, z)
 end
 
 local function wormDie(wID)
---	spEcho(wID, "died")
+	spEcho(wID, "died")
 	local w = worm[wID]
 	if w then
 		if w.underUnitID then
@@ -1111,6 +1118,7 @@ local function doWormMovementAndRipple(gf, second)
 		if w.vx and not w.emergedID then
 			w.x = mapClampX(w.x + (w.vx*w.speed))
 			w.z = mapClampZ(w.z + (w.vz*w.speed))
+			-- Spring.Echo(w.x, w.z)
 			-- SendToUnsynced("passWorm", wID, w.x, w.z, w.vx, w.vz, w.vx, w.vz, w.tx, w.tz, w.signSecond, w.endSecond ) --uncomment this to show the worms positions, vectors, and targets real time (uses gui_worm_debug.lua)
 		end
 		-- if not w.emergedID then
@@ -1239,6 +1247,7 @@ end
 if gadgetHandler:IsSyncedCode() then
 
 function gadget:Initialize()
+	Spring.Echo(0^2, mSqrt(0))
 	spMoveCtrlEnable = Spring.MoveCtrl.Enable
 	spMoveCtrlSetVelocity = Spring.MoveCtrl.SetVelocity
 	GG.wormEdibleUnit = edibleUnit
@@ -1307,22 +1316,16 @@ function gadget:GameFrame(gf)
 
 	evalCycle(gf, second) -- unit evaluation cycle
 
-	-- calculate vectors
+	-- calculate vectors and paths
 	if gf % 30 == 0 then
 		for wID, w in pairs(worm) do
-			if not w.tx then
-				-- spEcho("no target, using random target")
-				local tx, tz = nearestSand(mRandom(halfCellSize, sizeX-halfCellSize), mRandom(halfCellSize, sizeZ-halfCellSize))
-				w.tx = tx
-				w.tz = tz
-			end
 			wormDirect(w)
 			wormMoveUnderUnit(w) -- catch up worm under unit to current worm position
-			if not w.emergedID and (not w.nextRadarToggle or gf >= w.nextRadarToggle) then
-				w.stealth = not w.stealth
-				if w.underUnitID then spSetUnitStealth(w.underUnitID, w.stealth) end
-				w.nextRadarToggle = gf + mRandom(wormRadarFlashMin, wormRadarFlashMax)
-			end
+			-- if not w.emergedID and (not w.nextRadarToggle or gf >= w.nextRadarToggle) then
+			-- 	w.stealth = not w.stealth
+			-- 	if w.underUnitID then spSetUnitStealth(w.underUnitID, w.stealth) end
+			-- 	w.nextRadarToggle = gf + mRandom(wormRadarFlashMin, wormRadarFlashMax)
+			-- end
 		end
 	end
 
@@ -1399,12 +1402,14 @@ function gadget:UnitDestroyed(unitID, unitDefID, teamID, attackerID, attackerDef
 				wormDie(wID)
 			else
 				-- worm appatite whetted
+				w.tx, w.tz = nil, nil
 				w.endSecond = spGetGameSeconds() + baseWormDuration
 				if w.underUnitID then
 					spSetUnitHealth(w.underUnitID, spGetUnitHealth(unitID))
 					spSetUnitStealth(w.underUnitID, false)
 					spGiveOrderToUnit(w.underUnitID, CMD.CLOAK, {0}, {})
 				end
+				wormDirect(w)
 			end
 		end
 	else
