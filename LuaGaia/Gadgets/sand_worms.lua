@@ -25,7 +25,7 @@ local movementPerWormAnger = 100000 / wormAggression -- how much total movement 
 local unitsPerWormAnger = 500 / wormAggression
 
 -- non mapoption config
-local wormUnits = { 
+local wormEmergeUnitNames = { 
 	["sworm1"] = 1,
 	["sworm2"] = 2,
 	["sworm3"] = 3,
@@ -251,7 +251,7 @@ local function getSandUnitValues()
 	middle = middle ^ 0.3
 	-- Spring.Echo(highest, lowest, range, average, middle)
 	for uDefID, uDef in pairs(UnitDefs) do
-		if wormUnits[uDef.name] then
+		if wormEmergeUnitNames[uDef.name] then
 			inedible[uDefID] = true
 		elseif uDef.name == wormUnderUnitName then
 			inedible[uDefID] = true
@@ -400,6 +400,8 @@ local function edibleUnit(emergedUnitID, uID)
 	local groundType, _ = Spring.GetGroundInfo(ux, uz)
 	-- Spring.Echo("ground type?", groundType)
 	if groundType ~= sandType then return end
+	local gy = Spring.GetGroundHeight(ux, uz)
+	if uy - gy > biteHeight then return end
 	return true
 end
 
@@ -553,17 +555,9 @@ local function wormTargetting()
 			local groundHeight = Spring.GetGroundHeight(ux, uz) 
 			if groundType == sandType and uy < groundHeight + biteHeight then
 				local uDefID = Spring.GetUnitDefID(uID)
-				local uDef = UnitDefs[uDefID]
-				local uval = sandUnitValues[uDefID]
-				if wormUnits[uDef.name] then
-					-- don't eat emerged worms
-				elseif uDef.name == wormUnderUnitName then
-					-- don't eat yourself
-				elseif not wormEatMex and uval == mexValue then
-					-- don't target mexes if mapoption says no
-				elseif not wormEatCommander and uval == commanderValue then
-					-- don't target commanders if mapoption says no
-				else
+				if not inedibleDefIDs[uDefID] then
+					local uDef = UnitDefs[uDefID]
+					local uval = sandUnitValues[uDefID]
 					-- local uSize = math.ceil(uDef.height * uDef.radius)
 					local uSize = math.ceil(uDef.radius)
 					if uSize > largestSandUnitSize then largestSandUnitSize = uSize end
@@ -996,7 +990,7 @@ local function wormSpawn(x, z)
 		worm[wID] = w
 		wormBigSign(w)
 		-- Spring.Echo(speed, range)
-		passWormSign(spawnX, spawnZ)
+		-- passWormSign(spawnX, spawnZ)
 	end
 end
 
@@ -1084,7 +1078,7 @@ function gadget:Initialize()
 	gaiaTeam = Spring.GetGaiaTeamID()
 	wormReDir = loadWormReDir()
 	initializeAStar()
-	wormSizes = getWormSizes(wormUnits)
+	wormSizes = getWormSizes(wormEmergeUnitNames)
 	rippleExpand = createRippleExpansionMap()
 	initializeRippleMap()
 	nextPotentialEvent = Spring.GetGameSeconds() + wormEventFrequency
@@ -1093,7 +1087,7 @@ function gadget:Initialize()
 	for _, uID in pairs(units) do
 		local uDefID = Spring.GetUnitDefID(uID)
 		local uDef = UnitDefs[uDefID]
-		if uDef.name == wormUnderUnitName or wormUnits[uDef.name] then
+		if uDef.name == wormUnderUnitName or wormEmergeUnitNames[uDef.name] then
 			Spring.DestroyUnit(uID, false, true)
 		end
 	end
@@ -1235,28 +1229,21 @@ function gadget:GameFrame(gf)
 				for k, uID in pairs(unitsNearWorm) do
 					local uDefID = Spring.GetUnitDefID(uID)
 					local uDef = UnitDefs[uDefID]
-					if wormUnits[uDef.name] then
+					if wormEmergeUnitNames[uDef.name] then
 						-- do not attack units near other emerged worms
 						bestID = nil
 						break
-					elseif uDef.name ~= wormUnderUnitName and not alreadyAttacked[uID] and (excludeUnits[uID] == wID or not excludeUnits[uID]) and not w.size.badTargets[uID] then
+					elseif not inedibleDefIDs[uDefID] and not alreadyAttacked[uID] and (excludeUnits[uID] == wID or not excludeUnits[uID]) and not w.size.badTargets[uID] then
 						local uSize = math.ceil(uDef.radius)
 						if uSize <= w.size.maxMealSize then
 							local x, y, z = Spring.GetUnitPosition(uID)
 							local groundType, _ = Spring.GetGroundInfo(x, z)
-							if groundType == sandType and sandUnits[uID] then
-								-- local rockx, rockz = nearestRock(x, z)
-								-- local dx, dz = rockx - x, rockz - z
-								-- local rockdist = math.sqrt((rockx*rockx)+(rockz*rockz))
-								-- -- don't eat units too close to the rock
-								-- if rockdist > w.size.radius * 0.8 then
-									local uDefID = Spring.GetUnitDefID(uID)
-									local uval = sandUnitValues[uDefID]
-									if uval > bestVal then
-										bestID = uID
-										bestVal = uval
-									end
-								-- end
+							if groundType == sandType then
+								local uval = sandUnitValues[uDefID]
+								if uval > bestVal then
+									bestID = uID
+									bestVal = uval
+								end
 							end
 						end
 					end
@@ -1280,7 +1267,7 @@ function gadget:GameFrame(gf)
 				-- wormBigSign(w)
 				if not w.hasSigned and second >= w.signSecond then
 					wormBigSign(w)
-					passWormSign(w.x, w.z)
+					-- passWormSign(w.x, w.z)
 					w.hasSigned = true
 				end
 				if not w.hasQuaked and second > w.signSecond - 4 then
