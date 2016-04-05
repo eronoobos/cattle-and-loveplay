@@ -229,11 +229,12 @@ v6 -> v7
 - / limit bites to 3 or 4, and shatter multiple pieces at once if necessary
 - / use astar instead of dynamicrockavoid (keep worms from moving too near to the rock) see https://github.com/GloryFish/lua-astar/
 - / fix broken unit icons
+- / prevent worms from eating units, by passing unitdefids and unitids from the gadget
+- / use native radar instead of widget radar? by making an invisible unit move around the map as the underground worm?
 - make cegs and height ripples show how large the worm is, yet not have the height ripples look like crap when large
-- classify worm sizes by sounds used
 - rebalance sound volumes in playback
 - optimize all Spring and math functions
 - delete unecessary sounds and images
-- use native radar instead of widget radar? by making an invisible unit move around the map as the underground worm?
+- classify worm sizes by sounds used?
 - make lightning more efficient & less dumb looking by either using cegs properly (with direction vectors and radius), or with opengl lines?
 - BAD IDEA?: rather than movectrl, wait until the worms lips are most of the way out of the sand, and then evaluate what is inside and eat it. use a four-lipped worm to form a cage from with units can't escape. the model must have lips halfway open, so that when the mouth is fully open, the colvols are at 45 degrees or so

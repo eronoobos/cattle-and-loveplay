@@ -8,8 +8,16 @@ local sWormMout2 = piece "sWormMout2"
 local sWormMout3 = piece "sWormMout3"
 local foodmagnet = piece "foodmagnet"
 
+local wormUnderUnitName = "underworm" -- do not eat this, it is you
+local wormUnits = { 
+	["sworm1"] = 1,
+	["sworm2"] = 2,
+	["sworm3"] = 3,
+	["sworm4"] = 4, }
+local sandType = "Sand" -- the ground type that worm spawns in
+
 -- set based on unit definition in script.Create()
-local uDef
+local unitDef
 local modelHeight = 75
 local modelRadius = 36
 local maxMealSize = 36
@@ -102,7 +110,7 @@ local function ComeToMe(uID, x, y, z)
 	Spring.MoveCtrl.Enable(uID)
 	-- Spring.AddUnitImpulse(uID, -distx/10, 0.01, -distz/10)
 	-- Spring.Echo(distx, distz)
-	Spring.Echo(uy, y, disty)
+	-- Spring.Echo(uy, y, disty)
 	Spring.MoveCtrl.SetVelocity(uID, -distx/100, -disty/100, -distz/100)
 	Spring.MoveCtrl.SetRotationVelocity(uID, 0, math.random()*0.03-0.015, 0)
 end
@@ -127,17 +135,20 @@ local function Swallow(doomedByDist)
 	for dist, uID in pairsByKeys(doomedByDist) do
 		local awayWithYou = true
 		if mealSize < maxMealSize then
-			local uDef = GetUnitDef(uID)
-			if uDef then
-				local uSize = math.ceil(uDef.radius)
-				-- local uSize = mCeil(uDef.height * uDef.radius)
-				Spring.Echo(uSize)
-				local newMealSize = mealSize + uSize
-				if newMealSize <= maxMealSize then
-					table.insert(mealIDs, uID)
-					mealDefsByID[uID] = uDef
-					mealSize = newMealSize
-					awayWithYou = false
+			local edible = GG.wormEdibleUnit(unitID, uID)
+			if edible then
+				local uDef = GetUnitDef(uID)
+				if uDef then
+					local uSize = math.ceil(uDef.radius)
+					-- local uSize = mCeil(uDef.height * uDef.radius)
+					-- Spring.Echo(uSize)
+					local newMealSize = mealSize + uSize
+					if newMealSize <= maxMealSize then
+						table.insert(mealIDs, uID)
+						mealDefsByID[uID] = uDef
+						mealSize = newMealSize
+						awayWithYou = false
+					end
 				end
 			end
 		end
@@ -168,15 +179,15 @@ local function Swallow(doomedByDist)
 	Jaws(80, 10)
 	Move(center, y_axis, modelHeight, mFloor(modelHeight*0.15))
 	Spring.PlaySoundFile("WmRoar2",1.0,x,y,z)
-	Sleep(200)
+	MuchDirt(x, y, z, 2, 100)
 	Spring.PlaySoundFile("WmRoar1",1.0,x,y,z)
-	Sleep(200)
+	MuchDirt(x, y, z, 2, 100)
 
 	-- Sleep(600)
 
 	-- Move(foodmagnet,y_axis,-50 - unitHeight, 11) -- expecting unit to be attached to foodmagnet from this point towards
 	-- Move(center, y_axis, modelHeight, mFloor(modelHeight*0.15))
-	MuchDirt(x, y, z, 10, 10)
+	MuchDirt(x, y, z, 10, 20)
 	WaitForMove(center,y_axis)
 	local mostPieces = 0
 	local piecesByID = {}
@@ -193,11 +204,11 @@ local function Swallow(doomedByDist)
 	for b = 1, bites do
 		Jaws(20, 900)
 		Spring.PlaySoundFile("WmRoar3",1.0,x,y,z)
-		MuchDirt(x, y, z, 4)
+		MuchDirt(x, y, z, 5)
 		-- Spring.MoveCtrl.SetVelocity(diesFirstID, 0, 2, 0)
 		-- Spring.MoveCtrl.SetRotationVelocity(diesFirstID, math.random(2)-1, math.random(2)-1, math.random(2)-1)
 		Sleep(50)
-		MuchDirt(x, y, z, 4)
+		MuchDirt(x, y, z, 3)
 		local ate = false
 		for _, uID in pairs(mealIDs) do
 			-- Spring.MoveCtrl.Disable(uID)
@@ -217,36 +228,38 @@ local function Swallow(doomedByDist)
 						Spring.UnitScript.CallAsUnit(uID, Explode, pieceNumber, exploType)
 						Spring.UnitScript.CallAsUnit(uID, Hide, pieceNumber)
 					end
+					Spring.PlaySoundFile("WmCrunch1",1.0,x,y,z)
 					if #pieces == 0 then
-						Spring.PlaySoundFile("WmCrush1",1.0,x,y,z)
 						Sleep(50)
 						Spring.PlaySoundFile("WmExplode3",1.0,x,y,z)
 						Spring.DestroyUnit(uID, false, true)
+						MuchDirt(x, y, z, 5)
 						ate = true
 					else
-						Spring.PlaySoundFile("WmCrush1",1.0,x,y,z)
 						Sleep(50)
 						Spring.PlaySoundFile("WmExplode2",1.0,x,y,z)
+						MuchDirt(x, y, z, 3)
 					end
 				end
 			end
 		end
 		if not ate then
-			MuchDirt(x, y, z, 4, 200)
+			MuchDirt(x, y, z, 8, 100)
 			Jaws(80, 60)
 		end
-		MuchDirt(x, y, z, 5, 200)
+		MuchDirt(x, y, z, 10, 100)
 	end
 	Jaws(15, 2)
 	MuchDirt(x, y, z, 10, 200)
 end
 
 function script.Create()
-	uDef = GetUnitDef(unitID)
-	modelHeight = uDef.height
-	modelRadius = uDef.radius
-	maxMealSize = math.ceil(uDef.radius) * 0.888
-	-- maxMealSize = mCeil(0.6 * (uDef.height * uDef.radius))
+	-- gadgetHandler:RegisterGlobal('getWormData', getWormDataFunc)
+	unitDef = GetUnitDef(unitID)
+	modelHeight = unitDef.height
+	modelRadius = unitDef.radius
+	maxMealSize = math.ceil(unitDef.radius) * 0.888
+	-- maxMealSize = mCeil(0.6 * (unitDef.height * unitDef.radius))
 	doomRadius = mFloor(modelRadius * 1.8)
 	-- Spring.Echo("sworm created", modelHeight, modelRadius, maxMealSize, doomRadius)
 	SetWormColVols()
@@ -270,11 +283,16 @@ function script.Create()
 		if nearunits then
 			local unitsToSwallow = {}
 			local numToSwallow = 0
-			for _, nearunitid in ipairs (nearunits) do
-				if (nearunitid~=unitID) then
-					local dist = Spring.GetUnitSeparation(unitID, nearunitid, true)
-					unitsToSwallow[mCeil(dist)] = nearunitid
-					numToSwallow = numToSwallow + 1
+			for _, uID in ipairs (nearunits) do
+				local ux, uy, uz = Spring.GetUnitPosition(uID)
+				local groundType, _ = Spring.GetGroundInfo(ux, uz)
+				if groundType == sandType then
+					local dist = Spring.GetUnitSeparation(unitID, uID, true)
+					unitsToSwallow[mCeil(dist)] = uID
+					local edible = GG.wormEdibleUnit(unitID, uID)
+					if edible then
+						numToSwallow = numToSwallow + 1
+					end
 				end
 			end
 			if numToSwallow > 0 then Swallow(unitsToSwallow) end

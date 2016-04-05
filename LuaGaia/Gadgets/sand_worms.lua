@@ -10,6 +10,7 @@ function gadget:GetInfo()
    }
 end
 
+wormGlobalTest = "OMFG YOO GAIZ"
 
 -- configuration variables
 
@@ -29,6 +30,8 @@ local wormUnits = {
 	["sworm2"] = 2,
 	["sworm3"] = 3,
 	["sworm4"] = 4, }
+local wormUnderUnitName = "underworm" -- unit name for unit that moves around with the worm underground
+local wormTriggerUnitName = "wormtrigger" -- unit name that when spawned deletes itself and spawns a worm
 local wormSpeedLowerBias = 10 -- percentage below wormSpeed that an individual worm's speed can be. lowers with high wormAnger
 local wormSpeedUpperBias = 10 -- percentage above wormSpeed that an individual worm's speed can be
 local boxSize = 1024 -- for finding occupied areas to spawn worms near
@@ -54,6 +57,8 @@ local signEvalFrequency = 12 -- game frames between parts of a wormsign volley (
 local attackEvalFrequency = 30 -- game frames between attacking units in range of worm under sand
 
 -- storage variables
+local killMeNow = {} -- units to be killed on a particular frame (to avoid recursion)
+local inedibleDefIDs = {} -- units worms should not eat
 local astar = {} -- for later inclusion of the astar module
 local nodeDist2, nodeDist4
 local valid_node_func2, valid_node_func4
@@ -224,6 +229,7 @@ end
 
 local function getSandUnitValues()
 	local vals = {}
+	local inedible = {}
 	local highest = 0
 	local lowest = 999999
 	local sum = 0
@@ -245,11 +251,23 @@ local function getSandUnitValues()
 	middle = middle ^ 0.3
 	-- Spring.Echo(highest, lowest, range, average, middle)
 	for uDefID, uDef in pairs(UnitDefs) do
-		if uDef.showPlayerName then --string.find(string.lower(uDef.humanName), "commander") then
+		if wormUnits[uDef.name] then
+			inedible[uDefID] = true
+		elseif uDef.name == wormUnderUnitName then
+			inedible[uDefID] = true
+		elseif uDef.name == wormTriggerUnitName then
+			inedible[uDefID] = true
+		elseif uDef.showPlayerName then --string.find(string.lower(uDef.humanName), "commander") then
 			-- Spring.Echo(uDef.name, uDef.humanName, "is commander")
 			vals[uDefID] = commanderValue
+			if not wormEatCommander then
+				inedible[uDefID] = true
+			end
 		elseif uDef.extractsMetal > 0 then
 			vals[uDefID] = mexValue
+			if not wormEatMex then
+				inedible[uDefID] = true
+			end
 		elseif uDef.moveDef and uDef.moveDef.family == "hover" then
 			vals[uDefID] = hoverValue
 		else
@@ -260,7 +278,7 @@ local function getSandUnitValues()
 		end
 --		Spring.Echo(uDef.name, uDef.humanName, uDef.tooltip, vals[uDefID], cost, uDef.metalCost, uDef.energyCost, uDef.mass, fract)
 	end
-	return vals
+	return vals, inedible
 end
 
 local function createFullBulgeStamp(size)
@@ -360,6 +378,29 @@ local function nearestRock(x, z, minDist, maxDist)
 	end
 	if ax then return ax, az end
 	return x, z
+end
+
+local function edibleUnit(emergedUnitID, uID)
+	-- Spring.Echo(UnitDefs[Spring.GetUnitDefID(uID)].name)
+	local wID = isEmergedWorm[emergedUnitID]
+	-- Spring.Echo("excludeUnits?", excludeUnits[uID])
+	if excludeUnits[uID] and excludeUnits[uID] ~= wID then return end
+	if wID then
+		local w = worm[wID]
+		if w then
+			-- Spring.Echo("badTargets?", w.size.badTargets[uID])
+			if w.size.badTargets[uID] then return end
+		end
+	end
+	local uDefID = Spring.GetUnitDefID(uID)
+	if not uDefID then return end
+	-- Spring.Echo("inedibleDefIDs?", inedibleDefIDs[uDefID])
+	if inedibleDefIDs[uDefID] then return end
+	local ux, uy, uz = Spring.GetUnitPosition(uID)
+	local groundType, _ = Spring.GetGroundInfo(ux, uz)
+	-- Spring.Echo("ground type?", groundType)
+	if groundType ~= sandType then return end
+	return true
 end
 
 local function inWormMouth(x, z)
@@ -516,6 +557,8 @@ local function wormTargetting()
 				local uval = sandUnitValues[uDefID]
 				if wormUnits[uDef.name] then
 					-- don't eat emerged worms
+				elseif uDef.name == wormUnderUnitName then
+					-- don't eat yourself
 				elseif not wormEatMex and uval == mexValue then
 					-- don't target mexes if mapoption says no
 				elseif not wormEatCommander and uval == commanderValue then
@@ -549,40 +592,24 @@ local function wormTargetting()
 	return num, math.ceil(totalMovement)
 end
 
-local function signLightning(x, y, z)
-	local xrand = (2*mRandom()) - 1
-	local zrand = (2*mRandom()) - 1
+local function signLightning(x, z)
+	local y = Spring.GetGroundHeight(x, z)
 	local lx = 0
 	local lz = 0
-	for ly=0,2000,1 do
-		Spring.SpawnCEG("WORMSIGN_LIGHTNING",x+lx,y+ly,z+lz,0,1,0,2,0)
-		if ly % 16 == 0 then
-			xrand = (2*mRandom()) - 1
-			zrand = (2*mRandom()) - 1
-		end
-		lx = lx + xrand
-		lz = lz + zrand
+	local weaponDefID = WeaponDefNames["wormlightning"].id
+	for ly=0,2000,48 do
+		local xrand = (2*mRandom()) - 1
+		local zrand = (2*mRandom()) - 1
+		local dx = xrand * 48
+		local dz = zrand * 48
+		local projectileID = Spring.SpawnProjectile(weaponDefID, {["pos"] = {x+lx, y+ly, z+lz}, ["end"] = {x+lx+dx, y+ly+48, z+lz+dz}, ttl = 15, team = gaiaTeam, maxRange = 49, startAlpha = 1, endAlpha = 1, })
+		-- Spring.SetProjectilePosition(projectileID, x+lx, y+ly, z+lz)
+		Spring.SetProjectileTarget(projectileID, x+lx+dx, y+ly+48, z+lz+dz)
+		lx = lx + dx
+		lz = lz + dz
 	end
-	Spring.SpawnCEG("WORMSIGN_FLASH",x,y+10,z,0,1,0,2,0)
+	Spring.SpawnCEG("WORMSIGN_FLASH",x,y,z,0,1,0,2,0)
 end
-
--- local function signLightning(x, y, z)
--- 	local lx = 0
--- 	local lz = 0
--- 	local weaponDefID = WeaponDefNames["wormlightning"].id
--- 	for ly=0,2000,48 do
--- 		local xrand = (2*mRandom()) - 1
--- 		local zrand = (2*mRandom()) - 1
--- 		local dx = xrand * 48
--- 		local dz = zrand * 48
--- 		local projectileID = Spring.SpawnProjectile(weaponDefID, {["pos"] = {x+lx, y+ly, z+lz}, ["end"] = {x+lx+dx, y+ly+48, z+lz+dz}, ttl = 15, team = gaiaTeam, maxRange = 49, startAlpha = 1, endAlpha = 1, })
--- 		-- Spring.SetProjectilePosition(projectileID, x+lx, y+ly, z+lz)
--- 		Spring.SetProjectileTarget(projectileID, x+lx+dx, y+ly+48, z+lz+dz)
--- 		lx = lx + dx
--- 		lz = lz + dz
--- 	end
--- 	Spring.SpawnCEG("WORMSIGN_FLASH",x,y,z,0,1,0,2,0)
--- end
 
 
 local function signArcLightning(x, z, arcLength, heightDivisor, segLength, lightningCeg, flashCeg)
@@ -621,7 +648,7 @@ end
 local function wormBigSign(w)
 	local sx = w.x
 	local sz = w.z
-	-- signLightning(sx, sy, sz)
+	-- signLightning(sx, sz)
 	local minArc = math.ceil(w.size.radius * 8)
 	local maxArc = math.ceil(w.size.radius * 10)
 	signArcLightning( sx, sz, mRandom(minArc,maxArc), 1+mRandom(), 32, "WORMSIGN_LIGHTNING", "WORMSIGN_FLASH" )
@@ -826,6 +853,12 @@ local function normalizeVector(vx, vz)
 	return vx, vz
 end
 
+local function wormMoveUnderUnit(w)
+	if not w.underUnitID then return end
+	Spring.SetUnitPosition(w.underUnitID, w.x, w.z)
+	Spring.SetUnitVelocity(w.vx, 0, w.vz)
+end
+
 local function wormDirect(w)
 	local x = w.x
 	local z = w.z
@@ -949,7 +982,13 @@ local function wormSpawn(x, z)
 			speed = speed,
 			range = range,
 			size = wormSizes[size],
+			underUnitID = Spring.CreateUnit(wormUnderUnitName, spawnX, Spring.GetGroundHeight(spawnX, spawnZ), spawnZ, 0, gaiaTeam),
 		}
+		Spring.SetUnitRadiusAndHeight(w.underUnitID, math.ceil(w.size.radius*0.8), math.ceil(w.size.radius*0.1))
+		-- Spring.SetUnitCollisionVolumeData( w.underUnitID,
+		-- 	w.size.diameter, w.size.radius, w.size.diameter,
+		-- 	0, w.size.radius*0.5, 0,
+		-- 	2, 1, 1 )
 		if box then
 			-- go straight for it before first eval cycle
 			w.tx, w.tz = box.x, box.z
@@ -963,6 +1002,12 @@ end
 
 local function wormDie(wID)
 --	Spring.Echo(wID, "died")
+	local w = worm[wID]
+	if w then
+		if w.underUnitID then
+			killMeNow[w.underUnitID] = Spring.GetGameFrame() + 1
+		end
+	end
 	worm[wID] = nil
 	nextPotentialEvent = nextPotentialEvent + wormEventFrequency
 --	SendToUnsynced("passWorm", wID, nil)
@@ -1002,6 +1047,7 @@ local function wormAttack(targetID, wID)
 	end
 	local unitTeam = Spring.GetUnitTeam(targetID)
 	local attackerID = Spring.CreateUnit(w.size.unitName, x, y, z, 0, gaiaTeam, false)
+	if w.underUnitID then Spring.SetUnitHealth(attackerID, Spring.GetUnitHealth(w.underUnitID)) end
 	isEmergedWorm[attackerID] = wID
 	w.emergedID = attackerID
 	w.x, w.z = x, z
@@ -1012,6 +1058,11 @@ end
 if gadgetHandler:IsSyncedCode() then
 
 function gadget:Initialize()
+	GG.wormGlobalTest = "OMFGYOOGAIZ"
+	GG.wormTestFunc = function()
+		return "SOME SHIT"
+	end
+	GG.wormEdibleUnit = edibleUnit
 	local mapOptions = Spring.GetMapOptions()
 	if mapOptions then
 		if mapOptions.sand_worms == "0" then
@@ -1029,7 +1080,7 @@ function gadget:Initialize()
 		gadgetHandler:RemoveGadget()
 		return
 	end
-	sandUnitValues = getSandUnitValues()
+	sandUnitValues, inedibleDefIDs = getSandUnitValues()
 	gaiaTeam = Spring.GetGaiaTeamID()
 	wormReDir = loadWormReDir()
 	initializeAStar()
@@ -1037,6 +1088,15 @@ function gadget:Initialize()
 	rippleExpand = createRippleExpansionMap()
 	initializeRippleMap()
 	nextPotentialEvent = Spring.GetGameSeconds() + wormEventFrequency
+	-- clear leftover worm units
+	local units = Spring.GetTeamUnits(gaiaTeam)
+	for _, uID in pairs(units) do
+		local uDefID = Spring.GetUnitDefID(uID)
+		local uDef = UnitDefs[uDefID]
+		if uDef.name == wormUnderUnitName or wormUnits[uDef.name] then
+			Spring.DestroyUnit(uID, false, true)
+		end
+	end
 end
 
 function gadget:GameStart()
@@ -1050,7 +1110,14 @@ function gadget:GameFrame(gf)
 	if not areWorms then return end
 	
 	local second = Spring.GetGameSeconds()
-	
+
+	for uID, frame in pairs(killMeNow) do
+		if gf >= frame then
+			Spring.DestroyUnit(uID, false, true)
+			killMeNow[uID] = nil
+		end
+	end	
+
 	if gf % 4 == 0 then
 		signUnRippleExpand()
 		-- clearOldStamps()
@@ -1150,6 +1217,7 @@ function gadget:GameFrame(gf)
 			w.tz = tz
 		end
 		wormDirect(w)
+		wormMoveUnderUnit(w)
 	end
 
 	if numSandUnits > 0 then
@@ -1171,7 +1239,7 @@ function gadget:GameFrame(gf)
 						-- do not attack units near other emerged worms
 						bestID = nil
 						break
-					elseif not alreadyAttacked[uID] and not excludeUnits[uID] and not w.size.badTargets[uID] then
+					elseif uDef.name ~= wormUnderUnitName and not alreadyAttacked[uID] and (excludeUnits[uID] == wID or not excludeUnits[uID]) and not w.size.badTargets[uID] then
 						local uSize = math.ceil(uDef.radius)
 						if uSize <= w.size.maxMealSize then
 							local x, y, z = Spring.GetUnitPosition(uID)
@@ -1196,9 +1264,10 @@ function gadget:GameFrame(gf)
 				if bestID then
 					w.signSecond = second + 1 -- for ground ripples
 					wormAttack(bestID, wID)
+					-- if (Script.UnitScript('getWorm')) then
+				 --        Script.LuaUI.myevent(666)
+				 --   end
 					alreadyAttacked[bestID] = true
-					-- w.bellyCount = w.bellyCount + 1
-					-- Spring.Echo(w.bellyCount, wormBellyLimit, w.endSecond)
 				end
 			end
 		end
@@ -1208,6 +1277,7 @@ function gadget:GameFrame(gf)
 	if gf % signEvalFrequency == 0 then
 		for wID, w in pairs(worm) do
 			if not w.emergedID then
+				-- wormBigSign(w)
 				if not w.hasSigned and second >= w.signSecond then
 					wormBigSign(w)
 					passWormSign(w.x, w.z)
@@ -1240,6 +1310,19 @@ function gadget:UnitCreated(unitID, unitDefID, unitTeam, builderID)
 end
 
 function gadget:UnitDestroyed(unitID, unitDefID, teamID, attackerID, attackerDefID, attackerTeamID)
+	if unitDefID == UnitDefNames[wormUnderUnitName].id then
+		-- Spring.Echo("worm under unit killed")
+		for wID, w in pairs(worm) do
+			if w.underUnitID == unitID then
+				-- Spring.Echo("worm killed")
+				w.underUnitID = nil
+				wormDie(wID)
+				break
+			end
+		end
+		return
+	end
+
 	-- remove from units on sand table
 	if sandUnits[unitID] then
 		sandUnits[unitID] = nil
@@ -1255,12 +1338,14 @@ function gadget:UnitDestroyed(unitID, unitDefID, teamID, attackerID, attackerDef
 		isEmergedWorm[unitID] = nil
 		if w then
 			w.emergedID = nil
-			if w.bellyCount >= wormBellyLimit then
+			if attackerID or w.bellyCount >= wormBellyLimit then
+				-- worms that have been killed by an attacker die
 				-- worms that have eaten too much must take some time to rest & digest
 				wormDie(wID)
 			else
 				-- worm appatite whetted
 				w.endSecond = Spring.GetGameSeconds() + baseWormDuration
+				if w.underUnitID then Spring.SetUnitHealth(w.underUnitID, Spring.GetUnitHealth(unitID)) end
 			end
 		end
 	else

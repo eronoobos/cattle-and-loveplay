@@ -119,14 +119,8 @@ local Sounds = {
       gainmod = 0.1,
       pitchmod = 0.1,
     },
-    WmCrush1 = {
+    WmCrunch1 = {
       file = "sounds/crunch1.wav",
-      gain = 1.0,
-      gainmod = 0.1,
-      pitchmod = 0.1,
-    },
-    WmCrush2 = {
-      file = "sounds/crunch2.wav",
       gain = 1.0,
       gainmod = 0.1,
       pitchmod = 0.1,

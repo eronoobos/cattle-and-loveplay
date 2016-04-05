@@ -256,7 +256,7 @@ return {
     usedefaultexplosions = 0,
     groundflash = {
       flashSize = 100,
-      flashAlpha = 0.5,
+      flashAlpha = 0.35,
       ttl = 3,
       color = [[1.0, 0.5, 1.0]],
       useAirLos = 1,
