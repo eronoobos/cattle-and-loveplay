@@ -233,7 +233,7 @@ v6 -> v7
 - / use native radar instead of widget radar? by making an invisible unit move around the map as the underground worm?
 - / maybe only emerged worm should be attackable?
 - / silence weapon fire of unit being eaten
-- optimize all Spring and math functions
+- / localize all Spring and math functions
 - delete unecessary sounds and images
 - classify worm sizes by sounds used?
 - make lightning more efficient & less dumb looking by either using cegs properly (with direction vectors and radius), or with opengl lines?
