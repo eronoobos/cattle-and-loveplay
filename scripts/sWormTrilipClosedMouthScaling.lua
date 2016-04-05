@@ -125,7 +125,6 @@ local function ComeToMe(uID, x, y, z)
 	Spring.MoveCtrl.SetVelocity(uID, -distx/100, -disty/100, -distz/100)
 	Spring.MoveCtrl.SetRotationVelocity(uID, 0, math.random()*0.03-0.015, 0)
 	local uDef = GetUnitDef(uID)
-	Spring.Echo(#uDef.weapons)
 	for weaponID = 1, #uDef.weapons do
 		-- Spring.UnitWeaponHoldFire(uID, weaponID)
 		Spring.SetUnitWeaponState(uID, weaponID, {range=0})

@@ -10,8 +10,6 @@ function gadget:GetInfo()
    }
 end
 
-wormGlobalTest = "OMFG YOO GAIZ"
-
 -- configuration variables
 
 -- options that will be set by map options
@@ -25,6 +23,7 @@ local movementPerWormAnger = 100000 / wormAggression -- how much total movement 
 local unitsPerWormAnger = 500 / wormAggression
 
 -- non mapoption config
+local wormRadarFlashMin, wormRadarFlashMax = 30, 180 -- how many frames between worm going in an out of stealth?
 local wormEmergeUnitNames = { 
 	["sworm1"] = 1,
 	["sworm2"] = 2,
@@ -121,8 +120,10 @@ local spEcho = Spring.Echo
 local spGetGroundInfo = Spring.GetGroundInfo
 local spGetGroundHeight = Spring.GetGroundHeight
 local spGetUnitDefID = Spring.GetUnitDefID
+local spSetUnitPosition = Spring.SetUnitPosition
 local spGetUnitPosition = Spring.GetUnitPosition
 local spGetUnitBasePosition = Spring.GetUnitBasePosition
+local spSetUnitVelocity = Spring.SetUnitVelocity
 local spGetUnitVelocity = Spring.GetUnitVelocity
 local spSpawnCEG = Spring.SpawnCEG
 local spDestroyUnit = Spring.DestroyUnit
@@ -150,6 +151,13 @@ local spIsPosInRadar = Spring.IsPosInRadar
 local spSetHeightMapFunc = Spring.SetHeightMapFunc
 local spGetAllyTeamList = Spring.GetAllyTeamList
 local spGetGaiaTeamID = Spring.GetGaiaTeamID
+local spSetUnitStealth = Spring.SetUnitStealth
+local spSetUnitCloak = Spring.SetUnitCloak
+local spGetUnitsInSphere = Spring.GetUnitsInSphere
+
+-- localizations that must be set in Initialize
+local spMoveCtrlEnable
+local spMoveCtrlSetVelocity
 
 -- functions
 
@@ -890,7 +898,10 @@ end
 local function wormMoveUnderUnit(w)
 	if not w.underUnitID then return end
 	spSetUnitPosition(w.underUnitID, w.x, w.z)
-	spSetUnitVelocity(w.vx, 0, w.vz)
+	if w.vx then
+		-- spSetUnitVelocity(w.underUnitID, w.vx, 0, w.vz)
+		spMoveCtrlSetVelocity(w.underUnitID, w.vx, 0, w.vz)
+	end
 end
 
 local function wormDirect(w)
@@ -1019,6 +1030,7 @@ local function wormSpawn(x, z)
 			underUnitID = spCreateUnit(wormUnderUnitName, spawnX, spGetGroundHeight(spawnX, spawnZ), spawnZ, 0, gaiaTeam),
 		}
 		spSetUnitRadiusAndHeight(w.underUnitID, mCeil(w.size.radius*0.8), mCeil(w.size.radius*0.1))
+		spMoveCtrlEnable(w.underUnitID)
 		-- spSetUnitCollisionVolumeData( w.underUnitID,
 		-- 	w.size.diameter, w.size.radius, w.size.diameter,
 		-- 	0, w.size.radius*0.5, 0,
@@ -1085,6 +1097,137 @@ local function wormAttack(targetID, wID)
 	isEmergedWorm[attackerID] = wID
 	w.emergedID = attackerID
 	w.x, w.z = x, z
+	w.vx, w.vz = 0, 0
+	spSetUnitStealth(w.underUnitID, true)
+	spSetUnitCloak(w.underUnitID, true)
+end
+
+local function doWormMovementAndRipple(gf, second)
+	for wID, w in pairs(worm) do
+		if w.vx and not w.emergedID then
+			w.x = mapClampX(w.x + (w.vx*w.speed))
+			w.z = mapClampZ(w.z + (w.vz*w.speed))
+			-- SendToUnsynced("passWorm", wID, w.x, w.z, w.vx, w.vz, w.vx, w.vz, w.tx, w.tz, w.signSecond, w.endSecond ) --uncomment this to show the worms positions, vectors, and targets real time (uses gui_worm_debug.lua)
+		end
+		-- if not w.emergedID then
+			-- signStamp(w)
+		-- end
+		local rippleMult = nil
+		if second > w.signSecond-4 and second < w.signSecond+3 then -- and not w.emergedID then
+			-- if it's one second before or after worm sign second, ripple sand
+			lightning = mRandom() < 0.4
+			rippleMult = 1 / (1 + mAbs(second - w.signSecond))
+		elseif w.vx and not w.emergedID then
+			-- when moving, always ripple sand a little with occasional ground lightning
+			lightning = mRandom() < 0.3
+			rippleMult = 0.2
+		end
+		if rippleMult then
+			signStampRipple(w, rippleMult, lightning)
+			if mRandom() < rippleMult * 0.2 then
+				local cegx = mapClampX(w.x + mRandom(w.size.diameter) - w.size.radius)
+				local cegz = mapClampZ(w.z + mRandom(w.size.diameter) - w.size.radius)
+				local groundType, _ = spGetGroundInfo(cegx, cegz)
+				if groundType == sandType then
+					local cegy = spGetGroundHeight(cegx, cegz)
+					spSpawnCEG("sworm_dust",cegx,cegy,cegz,0,1,0,30,0)
+				end
+			end
+		end
+		if w.emergedID and mRandom() < 0.01 then
+			wormMediumSign(w)
+		end
+	end
+end
+
+local function evalCycle(gf, second)
+	if gf % evalFrequency ~= 0 then return end
+	-- reset bad targets
+	for s, size in pairs(wormSizes) do
+		for uID, endSecond in pairs(size.badTargets) do
+			if second >= endSecond then
+				size.badTargets[uID] = nil
+			end
+		end
+	end
+
+	-- handle deaths
+	for wID, w in pairs(worm) do
+		if second >= w.endSecond then
+			wormDie(wID)
+		end
+	end
+	
+	-- do targetting of units on sand
+	numSandUnits, totalSandMovement = wormTargetting()
+
+	-- calculate worm anger & dependent variables
+	wormAnger = ((numSandUnits + 1) / unitsPerWormAnger) + ((totalSandMovement + 1) / movementPerWormAnger)
+	maxWorms = mMin(3, mCeil(wormAnger))
+	wormBellyLimit = mMin(9, mCeil(1 + mSqrt(wormAnger * 21)))
+	wormSpeedLowerBias = mMax(0, 10 - mFloor(wormAnger * 4))
+	wormChance = mMin(1, 0.5 + mSqrt(wormAnger / 12))
+	if wormAnger > 2 then
+		wormEventFrequency = 5
+	else
+		wormEventFrequency = 5 + (0.55 * ((wormAnger - 3) ^ 4))
+	end
+	wormEventFrequency = mMin(60, mMax(5, mCeil(wormEventFrequency)))
+	-- spEcho(maxWorms, wormBellyLimit, wormSpeedLowerBias, wormChance, wormEventFrequency, wormAnger, numSandUnits, totalSandMovement, unitsPerWormAnger, movementPerWormAnger, wormAggression)
+	-- spawn worms
+	if numSandUnits > 0 and second >= nextPotentialEvent then
+--			spEcho("potential worm event...")
+		if mRandom() < wormChance then
+			wormSpawn()
+		end
+		nextPotentialEvent = second + wormEventFrequency
+	end
+end
+
+local function doWormAttacks(gf, second)
+	if numSandUnits == 0 then return end
+	local alreadyAttacked = {}
+	for wID, w in pairs(worm) do
+		if not w.emergedID and gf >= w.nextAttackEval then
+			w.nextAttackEval = gf + attackEvalFrequency
+			local wx = w.x
+			local wz = w.z
+			local wy = spGetGroundHeight(wx, wz)
+			local unitsNearWorm = spGetUnitsInSphere(wx, wy, wz, w.range)
+			local bestVal = -99999
+			local bestID
+			for k, uID in pairs(unitsNearWorm) do
+				local uDefID = spGetUnitDefID(uID)
+				local uDef = UnitDefs[uDefID]
+				if wormEmergeUnitNames[uDef.name] then
+					-- do not attack units near other emerged worms
+					bestID = nil
+					break
+				elseif not inedibleDefIDs[uDefID] and not alreadyAttacked[uID] and (excludeUnits[uID] == wID or not excludeUnits[uID]) and not w.size.badTargets[uID] then
+					local uSize = mCeil(uDef.radius)
+					if uSize <= w.size.maxMealSize then
+						local x, y, z = spGetUnitPosition(uID)
+						local groundType, _ = spGetGroundInfo(x, z)
+						if groundType == sandType then
+							local uval = sandUnitValues[uDefID]
+							if uval > bestVal then
+								bestID = uID
+								bestVal = uval
+							end
+						end
+					end
+				end
+			end
+			if bestID then
+				w.signSecond = second + 1 -- for ground ripples
+				wormAttack(bestID, wID)
+				-- if (Script.UnitScript('getWorm')) then
+			 --        Script.LuaUI.myevent(666)
+			 --   end
+				alreadyAttacked[bestID] = true
+			end
+		end
+	end
 end
 
 
@@ -1092,10 +1235,8 @@ end
 if gadgetHandler:IsSyncedCode() then
 
 function gadget:Initialize()
-	GG.wormGlobalTest = "OMFGYOOGAIZ"
-	GG.wormTestFunc = function()
-		return "SOME SHIT"
-	end
+	spMoveCtrlEnable = Spring.MoveCtrl.Enable
+	spMoveCtrlSetVelocity = Spring.MoveCtrl.SetVelocity
 	GG.wormEdibleUnit = edibleUnit
 	local mapOptions = spGetMapOptions()
 	if mapOptions then
@@ -1157,148 +1298,31 @@ function gadget:GameFrame(gf)
 		-- clearOldStamps()
 	end
 
-	-- worm movement and ripple sign
-	for wID, w in pairs(worm) do
-		if w.vx and not w.emergedID then
-			w.x = mapClampX(w.x + (w.vx*w.speed))
-			w.z = mapClampZ(w.z + (w.vz*w.speed))
-			-- SendToUnsynced("passWorm", wID, w.x, w.z, w.vx, w.vz, w.vx, w.vz, w.tx, w.tz, w.signSecond, w.endSecond ) --uncomment this to show the worms positions, vectors, and targets real time (uses gui_worm_debug.lua)
-		end
-		-- if not w.emergedID then
-			-- signStamp(w)
-		-- end
-		local rippleMult = nil
-		if second > w.signSecond-4 and second < w.signSecond+3 then -- and not w.emergedID then
-			-- if it's one second before or after worm sign second, ripple sand
-			lightning = mRandom() < 0.4
-			rippleMult = 1 / (1 + mAbs(second - w.signSecond))
-		elseif w.vx and not w.emergedID then
-			-- when moving, always ripple sand a little with occasional ground lightning
-			lightning = mRandom() < 0.3
-			rippleMult = 0.2
-		end
-		if rippleMult then
-			signStampRipple(w, rippleMult, lightning)
-			if mRandom() < rippleMult * 0.2 then
-				local cegx = mapClampX(w.x + mRandom(w.size.diameter) - w.size.radius)
-				local cegz = mapClampZ(w.z + mRandom(w.size.diameter) - w.size.radius)
-				local groundType, _ = spGetGroundInfo(cegx, cegz)
-				if groundType == sandType then
-					local cegy = spGetGroundHeight(cegx, cegz)
-					spSpawnCEG("sworm_dust",cegx,cegy,cegz,0,1,0,30,0)
-				end
-			end
-		end
-		if w.emergedID and mRandom() < 0.01 then
-			wormMediumSign(w)
-		end
-	end
-
+	doWormMovementAndRipple(gf, second) -- worm movement and ground ripple
 	writeNewRipples()
 
-	-- evaluation cycle
-	if gf % evalFrequency == 0 then
-
-		-- reset bad targets
-		for s, size in pairs(wormSizes) do
-			for uID, endSecond in pairs(size.badTargets) do
-				if second >= endSecond then
-					size.badTargets[uID] = nil
-				end
-			end
-		end
-	
-		-- handle deaths
-		for wID, w in pairs(worm) do
-			if second >= w.endSecond then
-				wormDie(wID)
-			end
-		end
-		
-		-- do targetting of units on sand
-		numSandUnits, totalSandMovement = wormTargetting()
-
-		-- calculate worm anger & dependent variables
-		wormAnger = ((numSandUnits + 1) / unitsPerWormAnger) + ((totalSandMovement + 1) / movementPerWormAnger)
-		maxWorms = mMin(3, mCeil(wormAnger))
-		wormBellyLimit = mMin(9, mCeil(1 + mSqrt(wormAnger * 21)))
-		wormSpeedLowerBias = mMax(0, 10 - mFloor(wormAnger * 4))
-		wormChance = mMin(1, 0.5 + mSqrt(wormAnger / 12))
-		if wormAnger > 2 then
-			wormEventFrequency = 5
-		else
-			wormEventFrequency = 5 + (0.55 * ((wormAnger - 3) ^ 4))
-		end
-		wormEventFrequency = mMin(60, mMax(5, mCeil(wormEventFrequency)))
-		-- spEcho(maxWorms, wormBellyLimit, wormSpeedLowerBias, wormChance, wormEventFrequency, wormAnger, numSandUnits, totalSandMovement, unitsPerWormAnger, movementPerWormAnger, wormAggression)
-		-- spawn worms
-		if numSandUnits > 0 and second >= nextPotentialEvent then
---			spEcho("potential worm event...")
-			if mRandom() < wormChance then
-				wormSpawn()
-			end
-			nextPotentialEvent = second + wormEventFrequency
-		end
-	end
+	evalCycle(gf, second) -- unit evaluation cycle
 
 	-- calculate vectors
-	for wID, w in pairs(worm) do
-		if not w.tx then
-			-- if no target then make a random target
-			-- spEcho("no target, using random target")
-			local tx, tz = nearestSand(mRandom(halfCellSize, sizeX-halfCellSize), mRandom(halfCellSize, sizeZ-halfCellSize))
-			w.tx = tx
-			w.tz = tz
-		end
-		wormDirect(w)
-		wormMoveUnderUnit(w)
-	end
-
-	if numSandUnits > 0 then
-		-- do worm attacks on units that are within range
-		local alreadyAttacked = {}
+	if gf % 30 == 0 then
 		for wID, w in pairs(worm) do
-			if not w.emergedID and gf >= w.nextAttackEval then
-				w.nextAttackEval = gf + attackEvalFrequency
-				local wx = w.x
-				local wz = w.z
-				local wy = spGetGroundHeight(wx, wz)
-				local unitsNearWorm = spGetUnitsInSphere(wx, wy, wz, w.range)
-				local bestVal = -99999
-				local bestID
-				for k, uID in pairs(unitsNearWorm) do
-					local uDefID = spGetUnitDefID(uID)
-					local uDef = UnitDefs[uDefID]
-					if wormEmergeUnitNames[uDef.name] then
-						-- do not attack units near other emerged worms
-						bestID = nil
-						break
-					elseif not inedibleDefIDs[uDefID] and not alreadyAttacked[uID] and (excludeUnits[uID] == wID or not excludeUnits[uID]) and not w.size.badTargets[uID] then
-						local uSize = mCeil(uDef.radius)
-						if uSize <= w.size.maxMealSize then
-							local x, y, z = spGetUnitPosition(uID)
-							local groundType, _ = spGetGroundInfo(x, z)
-							if groundType == sandType then
-								local uval = sandUnitValues[uDefID]
-								if uval > bestVal then
-									bestID = uID
-									bestVal = uval
-								end
-							end
-						end
-					end
-				end
-				if bestID then
-					w.signSecond = second + 1 -- for ground ripples
-					wormAttack(bestID, wID)
-					-- if (Script.UnitScript('getWorm')) then
-				 --        Script.LuaUI.myevent(666)
-				 --   end
-					alreadyAttacked[bestID] = true
-				end
+			if not w.tx then
+				-- spEcho("no target, using random target")
+				local tx, tz = nearestSand(mRandom(halfCellSize, sizeX-halfCellSize), mRandom(halfCellSize, sizeZ-halfCellSize))
+				w.tx = tx
+				w.tz = tz
+			end
+			wormDirect(w)
+			wormMoveUnderUnit(w) -- catch up worm under unit to current worm position
+			if not w.emergedID and (not w.nextRadarToggle or gf >= w.nextRadarToggle) then
+				w.stealth = not w.stealth
+				spSetUnitStealth(w.underUnitID, w.stealth)
+				w.nextRadarToggle = gf + mRandom(wormRadarFlashMin, wormRadarFlashMax)
 			end
 		end
 	end
+
+	doWormAttacks(gf, second) -- do worm attacks
 	
 	-- do worm sign lightning and pass wormsign markers to widget
 	if gf % signEvalFrequency == 0 then
@@ -1372,7 +1396,12 @@ function gadget:UnitDestroyed(unitID, unitDefID, teamID, attackerID, attackerDef
 			else
 				-- worm appatite whetted
 				w.endSecond = spGetGameSeconds() + baseWormDuration
-				if w.underUnitID then spSetUnitHealth(w.underUnitID, spGetUnitHealth(unitID)) end
+				if w.underUnitID then
+					spSetUnitHealth(w.underUnitID, spGetUnitHealth(unitID))
+					spSetUnitStealth(w.underUnitID, false)
+					spSetUnitCloak(w.underUnitID, false)
+					spEcho(Spring.GetUnitIsCloaked(w.underUnitID))
+				end
 			end
 		end
 	else

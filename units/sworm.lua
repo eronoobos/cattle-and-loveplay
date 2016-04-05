@@ -84,6 +84,8 @@ return {
 		blocking = false,
 		buildPic = "sworm.png",
 		canMove = true,
+		canCloak = true,
+		cloakTimeout = 1,
 		-- category = "ALL MOBILE WEAPON NOTSUB NOTSHIP NOTAIR NOTHOVER SURFACE",
 		description = "I'd like to be under the sand in a worm's garden.",
 		footprintX = 5,
