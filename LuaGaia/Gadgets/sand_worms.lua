@@ -86,7 +86,7 @@ local worm = {}
 local signFreqMin = wormSignFrequency / 2 -- the minimum pause between worm signs
 local signFreqMax = wormSignFrequency + signFreqMin -- maximum pause between worm signs
 local gaiaTeam -- which team is gaia? (set in Initialize())
-local wormReDir = {} -- precalculated 2d matrix of where to shunt the worm if it tries to move onto rock
+local wormReDir -- precalculated 2d matrix of where to shunt the worm if it tries to move onto rock
 local isEmergedWorm = {} -- is unitID an emerged attacking worm?
 local halfCellSize = cellSize / 2
 local sizeX = Game.mapSizeX 
@@ -114,6 +114,8 @@ local mMin = math.min
 local mCeil = math.ceil
 local mFloor = math.floor
 local mSqrt = math.sqrt
+local tInsert = table.insert
+local tRemove = table.remove
 
 -- localized Spring functions
 local spEcho = Spring.Echo
@@ -208,6 +210,9 @@ local function DistanceSq(x1, y1, x2, y2)
 end
 
 local function loadWormReDir()
+	if not VFS.FileExists('data/sand_worm_redirect_size.lua') or not VFS.FileExists('data/sand_worm_redirect_matrix.u8') then
+		return
+	end
 	local reDirSize = VFS.Include('data/sand_worm_redirect_size.lua')
 	local reDirRead = VFS.LoadFile('data/sand_worm_redirect_matrix.u8')
 	local reDirTable = VFS.UnpackU8(reDirRead, 1, reDirSize)
@@ -224,57 +229,36 @@ local function loadWormReDir()
 	return reDir
 end
 
-local function convertWormReDir(reDir, cellsWide)
-	cellsWide = cellsWide or 1
-	local width = cellSize * cellsWide
-	local halfWidth = mCeil(width / 2)
+local function getWormPathGraph(nodeSize)
+	local testsPerSide = 12
+	local halfNodeSize = nodeSize / 2
+	local testSize = nodeSize / testsPerSide
 	local graph = {}
 	local id = 1
-	for x = 0, sizeX, width do
-		for z = 0, sizeZ, width do
+	for cx = 0, sizeX-nodeSize, nodeSize do
+		local x = cx + halfNodeSize
+		for cz = 0, sizeZ-nodeSize, nodeSize do
+			local z = cz + halfNodeSize
 			local sand = true
-			for cx = x, x+width, cellSize do
-				for cz = z, z+width, cellSize do
-					if reDir[cx] and reDir[cx][cz] then
+			for tx = cx, cx+nodeSize, testSize do
+				for tz = cz, cz+nodeSize, testSize do
+					local groundType = spGetGroundInfo(tx, tz)
+					if groundType ~= sandType then
 						sand = false
 						break
 					end
-					if not sand then break end
 				end
+				if not sand then break end
 			end
 			if sand then
-				local node = {
-					x = x + halfWidth,
-					y = z + halfWidth,
-					id = id,
-				}
-				table.insert(graph, node)
+				local node = { x = x, y = z, id = id}
 				id = id + 1
+				tInsert(graph, node)
+				-- spMarkerAddPoint(x, 100, z, nodeSize)
 			end
 		end
 	end
-	-- spEcho(halfWidth, width, width + halfWidth)
 	return graph
-end
-
-local function initializeAStar()
-	wormGraph2 = convertWormReDir(wormReDir, 2)
-	wormGraph4 = convertWormReDir(wormReDir, 4)
-	astar = VFS.Include('a-star-lua/a-star.lua')
-	nodeDist2 = (((cellSize*2)^2) * 2) + 1
-	nodeDist4 = (((cellSize*4)^2) * 2) + 1
-	valid_node_func2 = function ( node, neighbor ) 
-		if astar.distance( node.x, node.y, neighbor.x, neighbor.y) < nodeDist2 then
-			return true
-		end
-		return false
-	end
-	valid_node_func4 = function ( node, neighbor ) 
-		if astar.distance( node.x, node.y, neighbor.x, neighbor.y) < nodeDist4 then
-			return true
-		end
-		return false
-	end
 end
 
 local function getSandUnitValues()
@@ -346,7 +330,7 @@ local function createFullBulgeStamp(size)
 			else
 				h = 1-(d^3)
 			end
-			table.insert(stamp, { x = x, z = z, h = h })
+			tInsert(stamp, { x = x, z = z, h = h })
 		end
 	end
 	return stamp
@@ -374,35 +358,32 @@ local function mapClampXZ(x, z)
 	return mapClampX(x), mapClampZ(z)
 end
 
-local function nodeHere(x, z, graph, nodeWidth)
+local function nodeHere(x, z, graph, nodeSize)
 	x, z = mapClampXZ(x, z)
-	local nx = (x - (x % nodeWidth)) + mCeil(nodeWidth/2)
-	local nz = (z - (z % nodeWidth)) + mCeil(nodeWidth/2)
+	local nx = (x - (x % nodeSize)) + mCeil(nodeSize/2)
+	local nz = (z - (z % nodeSize)) + mCeil(nodeSize/2)
 	local node = astar.find_node(nx, nz, graph) or astar.nearest_node(nx, nz, graph)
-	-- spEcho(x, z, nx, nz, nodeWidth, mCeil(nodeWidth/2), node)
+	-- spEcho(x, z, nx, nz, nodeSize, mCeil(nodeSize/2), node)
 	return node
 end
 
-local function nearestSand(ix, iz)
-	-- also clamps to map bounds
-	local x = mMax(mMin(ix, sizeX-halfCellSize), halfCellSize)
-	local z = mMax(mMin(iz, sizeZ-halfCellSize), halfCellSize)
+local function nearestSand(x, z)
 	local groundType, _ = spGetGroundInfo(x, z)
-	if groundType == sandType then
-		return x, z
-	else
-		local cx = x - (x % cellSize)
-		local cz = z - (z % cellSize)
+	if groundType == sandType then return x, z end
+	if wormReDir then
+		-- also clamps to map bounds
+		local cx = mMax(mMin(x, sizeX-halfCellSize), halfCellSize)
+		local cz = mMax(mMin(z, sizeZ-halfCellSize), halfCellSize)
+		cx = cx - (cx % cellSize)
+		cz = cz - (cz % cellSize)
 		if wormReDir[cx] then
 			if wormReDir[cx][cz] then
 				return wormReDir[cx][cz][1]+halfCellSize, wormReDir[cx][cz][2]+halfCellSize
-			else
-				return x, z
 			end
-		else
-			return x, z
 		end
 	end
+	local node = astar.nearest_node(x, z, wormSizes[1].wormGraph)
+	return node.x, node.y
 end
 
 local function nearestRock(x, z, minDist, maxDist)
@@ -472,17 +453,16 @@ local function getWormSizes(sizesByUnitName)
 	for unitName, s in pairs(sizesByUnitName) do
 		local uDef = UnitDefNames[unitName]
 		local bulgeStamp = createFullBulgeStamp(mCeil(uDef.radius / 8))
-		local nodeWidth = 128
-		local wormGraph = wormGraph2
-		local valid_node_func = valid_node_func2
-		if uDef.radius > 100 then
-			nodeWidth = 256
-			wormGraph = wormGraph4
-			valid_node_func = valid_node_func4
+		local nodeSize = math.ceil(uDef.radius * 2.1)
+		local wormGraph = getWormPathGraph(nodeSize)
+		local nodeDist = 1+ (2 * (nodeSize^2))
+		local valid_node_func = function ( node, neighbor ) 
+			if astar.distance( node.x, node.y, neighbor.x, neighbor.y) < nodeDist then
+				return true
+			end
+			return false
 		end
-		local nodeHalfWidth = nodeWidth / 2
-		local nodeRadius = mCeil( mSqrt((nodeHalfWidth^2)*2) )
-		local size = { radius = uDef.radius, diameter = uDef.radius * 2, maxMealSize = mCeil(uDef.radius * 0.888), bulgeStamp = bulgeStamp, rippleHeight = uDef.radius / 20, bulgeHeight = uDef.radius / 120, unitName = unitName, badTargets = {}, wormGraph = wormGraph, valid_node_func = valid_node_func, nodeWidth = nodeWidth, nodeHalfWidth = nodeHalfWidth, nodeRadius = nodeRadius }
+		local size = { radius = uDef.radius, diameter = uDef.radius * 2, maxMealSize = mCeil(uDef.radius * 0.888), bulgeStamp = bulgeStamp, rippleHeight = uDef.radius / 20, bulgeHeight = uDef.radius / 120, unitName = unitName, badTargets = {}, wormGraph = wormGraph, valid_node_func = valid_node_func, nodeSize = nodeSize }
 		sizes[s] = size
 	end
 	return sizes
@@ -509,7 +489,7 @@ local function occupyBox(uSize, ux, uz)
 			count = 1,
 			largestUnitSize = uSize,
 		}
-		table.insert(occupiedBoxes, box)
+		tInsert(occupiedBoxes, box)
 	end
 end
 
@@ -755,7 +735,7 @@ local function addRipple(x, z, hmod)
 			return
 		end
 		-- if rippleMap[rx][rz] == 0 then
-			table.insert(newRipples, {rx, rz, hmod})
+			tInsert(newRipples, {rx, rz, hmod})
 		-- end
 		-- rippleMap[rx][rz] = rippleMap[rx][rz] + hmod
 		-- x = rx * 8
@@ -808,7 +788,7 @@ local function writeNewRipples()
 			local hmod = vals[3]
 			spAddHeightMap(x, z, hmod)
 			if rippleMap[rx][rz] == 0 then
-				table.insert(rippled, {rx, rz})
+				tInsert(rippled, {rx, rz})
 			end
 			rippleMap[rx][rz] = rippleMap[rx][rz] + hmod
 		end
@@ -839,7 +819,7 @@ local function signUnRippleExpand()
 			else
 				spAddHeightMap(x, z, -hmod)
 				rippleMap[rx][rz] = 0
-				table.remove(rippled, id)
+				tRemove(rippled, id)
 			end
 		end
 	end)
@@ -858,7 +838,7 @@ local function signStamp(w)
 		end
 	end)
 	local gf = spGetGameFrame()
-	table.insert(oldStamps, {x = x, z = z, bulgeHeight = bh, stamp = w.size.bulgeStamp, endFrame = gf + 12, halfFrame = gf + 6 })
+	tInsert(oldStamps, {x = x, z = z, bulgeHeight = bh, stamp = w.size.bulgeStamp, endFrame = gf + 12, halfFrame = gf + 6 })
 end
 
 local function clearOldStamps()
@@ -875,7 +855,7 @@ local function clearOldStamps()
 						spAddHeightMap(x+stamp.x, z+stamp.z, -(stamp.h*bh)/2)
 					end
 				end
-				table.remove(oldStamps, i)
+				tRemove(oldStamps, i)
 			elseif not old.halved and gf >= old.halfFrame then
 				for _, stamp in pairs(old.stamp) do
 					local sx, sz = x+stamp.x, z+stamp.z
@@ -926,11 +906,11 @@ local function wormDirect(w)
 		w.vx, w.vz = normalizeVector(distx, distz)
 		return
 	end
-	if not w.path or (w.xPathed ~= w.tx and w.zPathed ~= w.tz) then -- DistanceXZ(w.tx, w.tz, w.path[#w.path].x, w.path[#w.path].y) > w.size.nodeRadius then
+	if not w.path or (w.xPathed ~= w.tx and w.zPathed ~= w.tz) then
 		-- create new path
 		local graph = w.size.wormGraph
-		local startNode = nodeHere(w.x, w.z, graph, w.size.nodeWidth) or w.targetNode
-		local goalNode = nodeHere(w.tx, w.tz, graph, w.size.nodeWidth)
+		local startNode = nodeHere(w.x, w.z, graph, w.size.nodeSize) or w.targetNode
+		local goalNode = nodeHere(w.tx, w.tz, graph, w.size.nodeSize)
 		if startNode and goalNode and startNode ~= goalNode then
 			w.path = astar.path(startNode, goalNode, graph, false, w.size.valid_node_func)
 			w.pathStep = 2
@@ -1271,7 +1251,7 @@ function gadget:Initialize()
 	sandUnitValues, inedibleDefIDs = getSandUnitValues()
 	gaiaTeam = spGetGaiaTeamID()
 	wormReDir = loadWormReDir()
-	initializeAStar()
+	astar = VFS.Include('a-star-lua/a-star.lua')
 	wormSizes = getWormSizes(wormEmergeUnitNames)
 	rippleExpand = createRippleExpansionMap()
 	initializeRippleMap()
