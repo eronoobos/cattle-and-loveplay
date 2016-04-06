@@ -909,9 +909,7 @@ end
 local function wormDirect(w)
 	if not w.tx then
 		-- spEcho("no target, using random target")
-		local tx, tz = nearestSand(mRandom(halfCellSize, sizeX-halfCellSize), mRandom(halfCellSize, sizeZ-halfCellSize))
-		w.tx = tx
-		w.tz = tz
+		w.tx, w.tz = nearestSand(mRandom(halfCellSize, sizeX-halfCellSize), mRandom(halfCellSize, sizeZ-halfCellSize))
 	end
 	local x = w.x
 	local z = w.z
@@ -952,34 +950,23 @@ local function wormDirect(w)
 				end
 			end
 		end
-		if not w.path then
-			-- spEcho("no nodes", w.x, w.z, w.tx, w.tz, startNode, goalNode)
-			w.vx = 1 - (2*mRandom())
-			w.vz = 1 - (2*mRandom())
-			w.vx, w.vz = normalizeVector(w.vx, w.vz)
-			w.tx = nil
-			w.tz = nil
-			return
-		end
 	end 
-	local nx, nz = w.targetNode.x, w.targetNode.y
-	if nx < x + r and nx > x - r and nz < z + r and nz > z - r then
-		if w.pathStep + 1 > #w.path then
-			-- last node, therefore near target
-			-- spEcho("last node")
-		else
-			-- go to next node on path
-			w.pathStep = w.pathStep + 1
-			w.targetNode = w.path[w.pathStep]
-			-- spEcho("next node", w.pathStep, tx, tz)
-		end
-	end
 	if w.targetNode then
-		if w.clearShot then
-			-- go straight to target along unobstructed path
-			tx, tz = w.tx, w.tz
+		local nx, nz = w.targetNode.x, w.targetNode.y
+		if nx < x + r and nx > x - r and nz < z + r and nz > z - r then
+			if w.pathStep + 1 > #w.path then
+				-- last node, therefore near target
+				-- spEcho("last node")
+			else
+				-- go to next node on path
+				w.pathStep = w.pathStep + 1
+				w.targetNode = w.path[w.pathStep]
+				-- spEcho("next node", w.pathStep, tx, tz)
+			end
 		else
-			tx, tz = w.targetNode.x, w.targetNode.y
+			if not w.clearShot then
+				tx, tz = w.targetNode.x, w.targetNode.y
+			end
 		end
 	end
 	local distx = tx - x
