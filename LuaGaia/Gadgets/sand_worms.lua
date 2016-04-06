@@ -932,19 +932,27 @@ local function wormDirect(w)
 		local goalNode = nodeHere(w.tx, w.tz, graph, w.size.nodeSize)
 		if startNode and goalNode and startNode ~= goalNode then
 			w.path = astar.path(startNode, goalNode, graph, false, w.size.valid_node_func)
-			w.pathStep = 2
-			w.targetNode = w.path[2]
-			w.xPathed, w.zPathed = w.tx, w.tz
-			w.clearShot = true
-			for i, node in ipairs(w.path) do
-				if i > 1 and i < #w.path and #node.neighbors < 8 then
-					-- node has rocks near it
-					-- spEcho("path has rocks")
-					w.clearShot = false
-					break
+			if w.path then
+				if not w.path[2] then
+					w.targetNode = w.path[1]
+					w.pathStep = 1
+				else
+					w.targetNode = w.path[2]
+					w.pathStep = 2
+				end
+				w.xPathed, w.zPathed = w.tx, w.tz
+				w.clearShot = true
+				for i, node in ipairs(w.path) do
+					if i > 1 and i < #w.path and #node.neighbors < 8 then
+						-- node has rocks near it
+						-- spEcho("path has rocks")
+						w.clearShot = false
+						break
+					end
 				end
 			end
-		else
+		end
+		if not w.path then
 			-- spEcho("no nodes", w.x, w.z, w.tx, w.tz, startNode, goalNode)
 			w.vx = 1 - (2*mRandom())
 			w.vz = 1 - (2*mRandom())
