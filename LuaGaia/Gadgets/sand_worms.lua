@@ -525,38 +525,9 @@ local function giveTargetToWorms(uID, uSize, uval, ux, uz, dx, dz)
 			local fardist = mSqrt(DistanceSq(w.x, w.z, farx, farz))
 			--	spEcho(wID, "sensed unit", uID, "at", ux, uz)
 			if fardist - uval < (w.bestDist or 999999) then
-				if uval < 0 then
-					-- for negative values (hovers, mexes, and commanders)
-					-- target badly, like a radar blip
-					local j = -uval
-					local jx = (mRandom() * j * 2) - j
-					local jz = (mRandom() * j * 2) - j
-					w.tx, w.tz = nearestSand(ux + jx, uz + jz)
-				else
-					local veltestmult = velmult / 2
-					local testx = ux + (velx * veltestmult)
-					local testz = uz + (velz * veltestmult)
-					local testa = AngleXYXY(w.x, w.z, testx, testz)
-					local cura = AngleXYXY(w.x, w.z, ux, uz)
-					local adist = AngleDist(cura, testa)
-					-- spEcho(cura, testa, adist)
-					if mAbs(adist) > halfPi then
-						w.tx, w.tz = ux, uz
-						-- spEcho("adist above halfpi, using ux, uz")
-					elseif mAbs(adist) > quarterPi then
-						local fortyFive = quarterPi
-						if adist < 0 then fortyFive = -quarterPi end
-						local newa = AngleAdd(cura, fortyFive)
-						w.tx, w.tz = CirclePos(w.x, w.z, dist, AngleAdd(cura, fortyFive))
-						-- spEcho("adist above quarterpi", fortyFive, newa)
-					else
-						w.tx, w.tz = CirclePos(w.x, w.z, dist, testa)
-						-- spEcho("adist below quarterpi, using testa")
-					end
-					-- w.tx, w.tz = ux, uz
-				end
 				w.bestDist = fardist - uval
 				w.targetUnitID = uID
+				w.targetUnitData = { ux = ux, uz = uz, uval = uval, dist = dist, velx = velx, velz = velz, velmult = velmult }
 			end
 		end
 	end
@@ -622,6 +593,42 @@ local function wormTargetting()
 				end
 			else
 				sandUnitPosition[uID] = nil
+			end
+		end
+	end
+	-- perform vector calcs on best worm targets
+	for wID, w in pairs(worm) do
+		if w.targetUnitData then
+			local u = w.targetUnitData
+			if u.uval < 0 then
+				-- for negative values (hovers, mexes, and commanders)
+				-- target badly, like a radar blip
+				local j = -u.uval
+				local jx = (mRandom() * j * 2) - j
+				local jz = (mRandom() * j * 2) - j
+				w.tx, w.tz = nearestSand(u.ux + jx, u.uz + jz)
+			else
+				local veltestmult = u.velmult / 2
+				local testx = u.ux + (u.velx * veltestmult)
+				local testz = u.uz + (u.velz * veltestmult)
+				local testa = AngleXYXY(w.x, w.z, testx, testz)
+				local cura = AngleXYXY(w.x, w.z, u.ux, u.uz)
+				local adist = AngleDist(cura, testa)
+				-- spEcho(cura, testa, adist)
+				if mAbs(adist) > halfPi then
+					w.tx, w.tz = u.ux, u.uz
+					-- spEcho("adist above halfpi, using ux, uz")
+				elseif mAbs(adist) > quarterPi then
+					local fortyFive = quarterPi
+					if adist < 0 then fortyFive = -quarterPi end
+					local newa = AngleAdd(cura, fortyFive)
+					w.tx, w.tz = CirclePos(w.x, w.z, u.dist, AngleAdd(cura, fortyFive))
+					-- spEcho("adist above quarterpi", fortyFive, newa)
+				else
+					w.tx, w.tz = CirclePos(w.x, w.z, u.dist, testa)
+					-- spEcho("adist below quarterpi, using testa")
+				end
+				-- w.tx, w.tz = u.ux, u.uz
 			end
 		end
 	end
@@ -1064,7 +1071,6 @@ local function wormSpawn(x, z)
 end
 
 local function wormDie(wID)
-	spEcho(wID, "died")
 	local w = worm[wID]
 	if w then
 		if w.underUnitID then
