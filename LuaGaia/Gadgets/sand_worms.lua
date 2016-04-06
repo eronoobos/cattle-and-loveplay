@@ -916,52 +916,48 @@ local function wormDirect(w)
 	local tx = w.tx
 	local tz = w.tz
 	local r = w.size.radius
-	if tx < x + r and tx > x - r and tz < z + r and tz > z - r then
-		-- spEcho("target near position.")
-		local distx = tx - x
-		local distz = tz - z
-		w.vx, w.vz = normalizeVector(distx, distz)
-		return
-	end
-	if not w.path or (w.xPathed ~= w.tx and w.zPathed ~= w.tz) then
-		-- need a new path
-		local graph = w.size.wormGraph
-		local startNode = nodeHere(w.x, w.z, graph, w.size.nodeSize) or w.targetNode
-		if startNode then
-			local goalNode = nodeHere(w.tx, w.tz, graph, w.size.nodeSize)
-			if goalNode and startNode ~= goalNode then
-				w.path = astar.path(startNode, goalNode, graph, false, w.size.valid_node_func)
-				if w.path then
-					if not w.path[2] then
-						w.pathStep = 1
-					else
-						w.pathStep = 2
-					end
-					w.targetNode[w.pathStep]
-					w.xPathed, w.zPathed = w.tx, w.tz
-					w.clearShot = true
-					for i, node in ipairs(w.path) do
-						if i > 1 and i < #w.path and #node.neighbors < 8 then
-							-- node has rocks near it
-							-- spEcho("path has rocks")
-							w.clearShot = false
-							break
+	if not (tx < x + r and tx > x - r and tz < z + r and tz > z - r) then
+		-- not near the target yet
+		if not w.path or (w.xPathed ~= tx and w.zPathed ~= tz) then
+			-- need a new path
+			local graph = w.size.wormGraph
+			local startNode = nodeHere(x, z, graph, w.size.nodeSize) or w.targetNode
+			if startNode then
+				local goalNode = nodeHere(tx, tz, graph, w.size.nodeSize)
+				if goalNode and startNode ~= goalNode then
+					w.path = astar.path(startNode, goalNode, graph, false, w.size.valid_node_func)
+					if w.path then
+						if not w.path[2] then
+							w.pathStep = 1
+						else
+							w.pathStep = 2
+						end
+						w.targetNode[w.pathStep]
+						w.xPathed, w.zPathed = tx, tz
+						w.clearShot = true
+						for i, node in ipairs(w.path) do
+							if i > 1 and i < #w.path and #node.neighbors < 8 then
+								-- spEcho("path has rocks")
+								w.clearShot = false
+								break
+							end
 						end
 					end
 				end
 			end
-		end
-	end 
-	if w.targetNode and not w.clearShot then
-		local nx, nz = w.targetNode.x, w.targetNode.y
-		if nx < x + r and nx > x - r and nz < z + r and nz > z - r and w.pathStep < #w.path then
-			-- we're at the targetNode and it's not the last node
-			w.pathStep = w.pathStep + 1
-			w.targetNode = w.path[w.pathStep]
-			-- spEcho("going to next node", w.pathStep, tx, tz)
-		else
-			-- still need to get to the targetNode
-			tx, tz = w.targetNode.x, w.targetNode.y
+		end 
+		if w.targetNode and not w.clearShot then
+			-- have a path and it's not clear of rocks
+			local nx, nz = w.targetNode.x, w.targetNode.y
+			if nx < x + r and nx > x - r and nz < z + r and nz > z - r and w.pathStep < #w.path then
+				-- we're at the targetNode and it's not the last node
+				w.pathStep = w.pathStep + 1
+				w.targetNode = w.path[w.pathStep]
+				-- spEcho("going to next node", w.pathStep, tx, tz)
+			else
+				-- still need to get to the targetNode
+				tx, tz = w.targetNode.x, w.targetNode.y
+			end
 		end
 	end
 	local distx = tx - x
@@ -992,7 +988,7 @@ local function wormSpawn(x, z)
 	if id <= maxWorms then
 		local box
 		if x and z then
-			-- we're all fine here
+			-- we're all fine here, have position to spawn at
 		elseif #occupiedBoxes > 0 then
 			local highestDist = 0
 			local highestBox
