@@ -196,6 +196,15 @@ local function AngleDist(angle1, angle2)
   return a
 end
 
+function meanAngle (angleList)
+	local sumSin, sumCos = 0, 0
+	for i, angle in pairs(angleList) do
+		sumSin = sumSin + mSin(angle)
+		sumCos = sumCos + mCos(angle)
+	end
+	return mAtan2(sumSin, sumCos)
+end
+
 local function CirclePos(cx, cy, dist, angle)
   angle = angle or mRandom() * twicePi
   local x = cx + dist * mCos(angle)
@@ -467,12 +476,14 @@ local function getWormSizes(sizesByUnitName)
 	return sizes
 end
 
-local function occupyBox(uSize, ux, uz)
+local function occupyBox(uSize, ux, uz, dx, dz)
 	local insideBox = false
 	for ib, box in pairs(occupiedBoxes) do
 		if ux > box.xmin and ux < box.xmax and uz > box.zmin and uz < box.zmax then
 			box.count = box.count + 1
 			if uSize > box.largestUnitSize then box.largestUnitSize = uSize end
+			box.dxSum = box.dxSum + dx
+			box.dzSum = box.dzSum + dz
 			insideBox = true
 			break
 		end
@@ -487,6 +498,8 @@ local function occupyBox(uSize, ux, uz)
 			zmax = mapClampZ(uz + halfBoxSize),
 			count = 1,
 			largestUnitSize = uSize,
+			dxSum = dx,
+			dzSum = dz,
 		}
 		tInsert(occupiedBoxes, box)
 	end
@@ -603,7 +616,7 @@ local function wormTargetting()
 					sandUnitPosition[uID] = {x = ux, z = uz}
 					sandUnits[uID] = true
 					num = num + 1
-					occupyBox(uSize, ux, uz) -- sort into non-grid boxes of units
+					occupyBox(uSize, ux, uz, dx, dz) -- sort into non-grid boxes of units
 					if not excludeUnits[uID] then giveTargetToWorms(uID, uSize, uval, ux, uz, dx, dz) end
 	--				SendToUnsynced("passSandUnit", uID, uval)
 				end
@@ -984,8 +997,24 @@ local function wormSpawn(x, z)
 		if x and z then
 			-- we're all fine here
 		elseif #occupiedBoxes > 0 then
-			box = occupiedBoxes[mRandom(#occupiedBoxes)]
-			x, z = CirclePos(box.x, box.z, wormSpawnDistance)
+			local highestDist = 0
+			local highestBox
+			for _, b in pairs(occupiedBoxes) do
+				local lowestDist
+				for _, w in pairs(worm) do
+					local dist = DistanceSq(b.x, b.z, w.x, w.z)
+					if not lowestDist or dist < lowestDist then
+						lowestDist = dist
+					end
+				end
+				if lowestDist and lowestDist > highestDist then
+					highestDist = lowestDist
+					highestBox = b
+				end
+			end
+			box = highestBox or occupiedBoxes[mRandom(#occupiedBoxes)]
+			local movementAngle = mAtan2(box.dzSum, box.dxSum)
+			x, z = CirclePos(box.x, box.z, wormSpawnDistance, movementAngle)
 		else
 			x, _, z = randomXYZ()
 		end
@@ -1226,7 +1255,6 @@ end
 if gadgetHandler:IsSyncedCode() then
 
 function gadget:Initialize()
-	Spring.Echo(0^2, mSqrt(0))
 	spMoveCtrlEnable = Spring.MoveCtrl.Enable
 	spMoveCtrlSetVelocity = Spring.MoveCtrl.SetVelocity
 	GG.wormEdibleUnit = edibleUnit

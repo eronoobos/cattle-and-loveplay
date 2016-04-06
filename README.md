@@ -234,7 +234,10 @@ v6 -> v7
 - / maybe only emerged worm should be attackable?
 - / silence weapon fire of unit being eaten
 - / localize all Spring and math functions
+- / spawn worms near boxes far from the other worms
+- / spawn worms along the target box's average movement vector
+- update unitpic
 - remove worm radar?
-- delete unecessary sounds and images
+- delete unecessary files
 - make lightning more efficient & less dumb looking by either using projectiles (beamlaser), or with opengl lines?
 - BAD IDEA?: rather than movectrl, wait until the worms lips are most of the way out of the sand, and then evaluate what is inside and eat it. use a four-lipped worm to form a cage from with units can't escape. the model must have lips halfway open, so that when the mouth is fully open, the colvols are at 45 degrees or so
