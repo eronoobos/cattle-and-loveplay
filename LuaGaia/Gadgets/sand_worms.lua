@@ -924,49 +924,44 @@ local function wormDirect(w)
 		return
 	end
 	if not w.path or (w.xPathed ~= w.tx and w.zPathed ~= w.tz) then
-		-- create new path
+		-- need a new path
 		local graph = w.size.wormGraph
 		local startNode = nodeHere(w.x, w.z, graph, w.size.nodeSize) or w.targetNode
-		local goalNode = nodeHere(w.tx, w.tz, graph, w.size.nodeSize)
-		if startNode and goalNode and startNode ~= goalNode then
-			w.path = astar.path(startNode, goalNode, graph, false, w.size.valid_node_func)
-			if w.path then
-				if not w.path[2] then
-					w.targetNode = w.path[1]
-					w.pathStep = 1
-				else
-					w.targetNode = w.path[2]
-					w.pathStep = 2
-				end
-				w.xPathed, w.zPathed = w.tx, w.tz
-				w.clearShot = true
-				for i, node in ipairs(w.path) do
-					if i > 1 and i < #w.path and #node.neighbors < 8 then
-						-- node has rocks near it
-						-- spEcho("path has rocks")
-						w.clearShot = false
-						break
+		if startNode then
+			local goalNode = nodeHere(w.tx, w.tz, graph, w.size.nodeSize)
+			if goalNode and startNode ~= goalNode then
+				w.path = astar.path(startNode, goalNode, graph, false, w.size.valid_node_func)
+				if w.path then
+					if not w.path[2] then
+						w.pathStep = 1
+					else
+						w.pathStep = 2
+					end
+					w.targetNode[w.pathStep]
+					w.xPathed, w.zPathed = w.tx, w.tz
+					w.clearShot = true
+					for i, node in ipairs(w.path) do
+						if i > 1 and i < #w.path and #node.neighbors < 8 then
+							-- node has rocks near it
+							-- spEcho("path has rocks")
+							w.clearShot = false
+							break
+						end
 					end
 				end
 			end
 		end
 	end 
-	if w.targetNode then
+	if w.targetNode and not w.clearShot then
 		local nx, nz = w.targetNode.x, w.targetNode.y
-		if nx < x + r and nx > x - r and nz < z + r and nz > z - r then
-			if w.pathStep + 1 > #w.path then
-				-- last node, therefore near target
-				-- spEcho("last node")
-			else
-				-- go to next node on path
-				w.pathStep = w.pathStep + 1
-				w.targetNode = w.path[w.pathStep]
-				-- spEcho("next node", w.pathStep, tx, tz)
-			end
+		if nx < x + r and nx > x - r and nz < z + r and nz > z - r and w.pathStep < #w.path then
+			-- we're at the targetNode and it's not the last node
+			w.pathStep = w.pathStep + 1
+			w.targetNode = w.path[w.pathStep]
+			-- spEcho("going to next node", w.pathStep, tx, tz)
 		else
-			if not w.clearShot then
-				tx, tz = w.targetNode.x, w.targetNode.y
-			end
+			-- still need to get to the targetNode
+			tx, tz = w.targetNode.x, w.targetNode.y
 		end
 	end
 	local distx = tx - x
