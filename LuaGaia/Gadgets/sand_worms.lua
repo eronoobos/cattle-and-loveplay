@@ -230,9 +230,8 @@ local function loadWormReDir()
 end
 
 local function getWormPathGraph(nodeSize)
-	local testsPerSide = 12
 	local halfNodeSize = nodeSize / 2
-	local testSize = nodeSize / testsPerSide
+	local testSize = 16
 	local graph = {}
 	local id = 1
 	for cx = 0, sizeX-nodeSize, nodeSize do
