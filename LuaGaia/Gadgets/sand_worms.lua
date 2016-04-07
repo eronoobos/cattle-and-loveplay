@@ -932,14 +932,17 @@ local function wormDirect(w)
 						else
 							w.pathStep = 2
 						end
-						w.targetNode[w.pathStep]
+						w.targetNode = w.path[w.pathStep]
 						w.xPathed, w.zPathed = tx, tz
 						w.clearShot = true
-						for i, node in ipairs(w.path) do
-							if i > 1 and i < #w.path and #node.neighbors < 8 then
-								-- spEcho("path has rocks")
-								w.clearShot = false
-								break
+						if #w.path > 2 then
+							for i = 2, #w.path-1 do
+								local node = w.path[i]
+								if node and #node.neighbors < 8 then
+									-- spEcho("path has rocks")
+									w.clearShot = false
+									break
+								end
 							end
 						end
 					end
