@@ -179,7 +179,7 @@ function astar.find_node ( x, y, nodes )
 	end
 end
 
-function astar.nearest_node( x, y, nodes )
+function astar.nearest_node( x, y, nodes, nodeDist )
 	local bestDist
 	local bestNode
 	for _, node in ipairs ( nodes ) do
@@ -187,6 +187,7 @@ function astar.nearest_node( x, y, nodes )
 		if not bestDist or d < bestDist then
 			bestDist = d
 			bestNode = node
+			if nodeDist and d < nodeDist then break end
 		end
 	end
 	return bestNode

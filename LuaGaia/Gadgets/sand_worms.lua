@@ -59,10 +59,6 @@ local attackEvalFrequency = 30 -- game frames between attacking units in range o
 local killMeNow = {} -- units to be killed on a particular frame (to avoid recursion)
 local inedibleDefIDs = {} -- units worms should not eat
 local astar = {} -- for later inclusion of the astar module
-local nodeDist2, nodeDist4
-local valid_node_func2, valid_node_func4
-local wormGraph2 = {} -- 2x2 reDir cells make up each graph node
-local wormGraph4 = {} -- 4x4 reDir cells make up each graph node
 local excludeUnits = {}
 local newRipples = {}
 local oldStamps = {}

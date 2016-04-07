@@ -17,6 +17,10 @@ local sinkWrecks = true
 local areWorms = true
 
 local sandType = { ["Sand"] = true }
+local sandGraph
+local sandNodeSize = 256
+local sandNodeDist = ((sandNodeSize / 2)^2 * 2)
+local astar
 
 local sandTitle
 local sandWarning
@@ -33,101 +37,53 @@ local goodCamState = {}
 local sandX
 local sandY
 
+local spGetGroundInfo = Spring.GetGroundInfo
+local tInsert = table.insert
+
+local function getSandGraph(nodeSize)
+	local halfNodeSize = nodeSize / 2
+	local testSize = 16
+	local graph = {}
+	local id = 1
+	for cx = 0, sizeX-nodeSize, nodeSize do
+		local x = cx + halfNodeSize
+		for cz = 0, sizeZ-nodeSize, nodeSize do
+			local z = cz + halfNodeSize
+			local sand = true
+			for tx = cx, cx+nodeSize, testSize do
+				for tz = cz, cz+nodeSize, testSize do
+					local groundType = spGetGroundInfo(tx, tz)
+					if not sandType[groundType] then
+						sand = false
+						break
+					end
+				end
+				if not sand then break end
+			end
+			if sand then
+				local node = { x = x, y = z, id = id}
+				id = id + 1
+				tInsert(graph, node)
+				-- spMarkerAddPoint(x, 100, z, nodeSize)
+			end
+		end
+	end
+	return graph
+end
+
 local function DoLine(x1, y1, z1, x2, y2, z2)
     gl.Vertex(x1, y1, z1)
     gl.Vertex(x2, y2, z2)
 end
 
-local function findGroundType(negative, targetTypes, xmin, ymin, xmax, ymax)
-	local groundType = nil
-	local gap = 64
-	local x
-	local y
-	local ix = gap
-	local iy = gap
-	local startx = xmin
-	local starty = ymin
-	local endx = xmax
-	local endy = ymax
-	if negative then
-		ix = -gap
-		iy = -gap
-		startx = xmax
-		starty = ymax
-		endx = xmin
-		endy = ymin
-	end
-	
-	local beginPatch
-	local patchSize = 0
-	local patchX
-	local patchSizeX = 0
-	local bestBegin
-	local bestSize = 0
-	local bestSizeX = 0
-	local bestX
-	local inPatch = false
-	local lastIn = {}
-	
-	for sx=startx, endx, ix do
-		for sy=starty, endy, iy do
-			local _, pos = Spring.TraceScreenRay(sx, sy, true)
-			if pos ~= nil then
-				local groundType, _ = Spring.GetGroundInfo(pos[1], pos[3])
-				if targetTypes[groundType] then
-					if not inPatch then
-						beginPatch = sy
-						patchSize = 1
-						patchX = sx
-						if lastIn[sy] then
-							patchSizeX = 1
-						else
-							patchSizeX = 0
-						end
-						inPatch = true
---						gl.Rect(sx-16, sy-16, sx+16, sy+16)
-					else
-						patchSize = patchSize + 1
-						if lastIn[sy] then
-							patchSizeX = patchSizeX + 1
-						end
---						gl.Rect(sx-8, sy-8, sx+8, sy+8)
-					end
-					lastIn[sy] = true
-				else
-					inPatch = false
-					lastIn[sy] = false
-				end
-			else
-				inPatch = false
-			end
-			if not inPatch and patchSize + patchSizeX > bestSize + bestSizeX then
-				bestBegin = beginPatch
-				bestSize = patchSize
-				bestX = sx
---				gl.BeginEnd(GL.LINE_STRIP, DoLine, sx, , 0, patchX[patch], beginPatch[patch] + (patchSize[patch]*iy), 0)
-			end
+local function nearestNodeScreenCoords(sx, sy, nodes, nodeDist)
+	local _, pos = Spring.TraceScreenRay(sx, sy, true)
+	if pos then
+		local node = astar.nearest_node(pos[1], pos[3], nodes, nodeDist)
+		if node then
+			local nsx, nsy = Spring.WorldToScreenCoords(node.x, Spring.GetGroundHeight(node.x, node.y), node.y)
+			return nsx, nsy
 		end
-		if patchSize + patchSizeX > bestSize + bestSizeX then
-			bestBegin = beginPatch
-			bestSize = patchSize
-			bestSizeX = patchSizeX
-			bestX = sx
-		end
-		inPatch = false
-	end
-
-	if bestSize > 1 then
---			gl.BeginEnd(GL.LINE_STRIP, DoLine, patchX[patch], beginPatch[patch], 0, patchX[patch], beginPatch[patch] + (patchSize[patch]*iy), 0)
-		x = bestX
-		if bestSize == 1 then
-			y = bestBegin
-		else
-			y = math.floor(bestBegin + ((bestSize - 1)*(iy/2)))
-		end
-		return x, y
-	else
-		return nil, nil
 	end
 end
 
@@ -188,6 +144,8 @@ function widget:Initialize()
 			sandTitle = "HAZARDOUS SAND"
 			sandWarning = sandWarning .. " Worms eat units."
 		end
+		sandGraph = getSandGraph(sandNodeSize)
+		astar = VFS.Include('a-star-lua/a-star.lua')
 	end
 end
 
@@ -238,12 +196,8 @@ function widget:DrawScreen()
 				if sameCam and sandX then
 					sx, sy = sandX, sandY
 				else
-					sx, sy = findGroundType(true, sandType, viewX*0.65, 16, viewX-16, viewY-16)
-					if not sx then
-						sx, sy = findGroundType(true, sandType, viewX*0.15, viewY*0.3, viewX*0.65, viewY-16)
-					end
-					sandX = sx
-					sandY = sy
+					sx, sy = nearestNodeScreenCoords(viewX*0.8, viewY*0.5, sandGraph, sandNodeDist)
+					if sx then sandX, sandY = sx, sy end
 				end
 				
 				if sx then
