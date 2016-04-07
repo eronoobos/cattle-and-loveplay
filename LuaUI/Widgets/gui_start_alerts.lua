@@ -16,6 +16,8 @@ local restrictSand = true
 local sinkWrecks = true
 local areWorms = true
 
+local sandType = { ["Sand"] = true }
+
 local sandTitle
 local sandWarning
 
@@ -28,8 +30,6 @@ local sizeZ = Game.mapSizeZ
 local alertHeight = 250
 
 local goodCamState = {}
-local rockX
-local rockY
 local sandX
 local sandY
 
@@ -38,10 +38,8 @@ local function DoLine(x1, y1, z1, x2, y2, z2)
     gl.Vertex(x2, y2, z2)
 end
 
-local function findGroundType(negative, targetType, xmin, ymin, xmax, ymax)
+local function findGroundType(negative, targetTypes, xmin, ymin, xmax, ymax)
 	local groundType = nil
-	local secondTargetType = ""
-	if targetType == "Rock" then secondTargetType = "Rough Rock" end
 	local gap = 64
 	local x
 	local y
@@ -76,7 +74,7 @@ local function findGroundType(negative, targetType, xmin, ymin, xmax, ymax)
 			local _, pos = Spring.TraceScreenRay(sx, sy, true)
 			if pos ~= nil then
 				local groundType, _ = Spring.GetGroundInfo(pos[1], pos[3])
-				if groundType == targetType or groundType == secondTargetType then
+				if targetTypes[groundType] then
 					if not inPatch then
 						beginPatch = sy
 						patchSize = 1
@@ -240,9 +238,9 @@ function widget:DrawScreen()
 				if sameCam and sandX then
 					sx, sy = sandX, sandY
 				else
-					sx, sy = findGroundType(true, "Sand", viewX*0.65, 16, viewX-16, viewY-16)
+					sx, sy = findGroundType(true, sandType, viewX*0.65, 16, viewX-16, viewY-16)
 					if not sx then
-						sx, sy = findGroundType(true, "Sand", viewX*0.15, viewY*0.3, viewX*0.65, viewY-16)
+						sx, sy = findGroundType(true, sandType, viewX*0.15, viewY*0.3, viewX*0.65, viewY-16)
 					end
 					sandX = sx
 					sandY = sy
@@ -278,7 +276,7 @@ function widget:DrawWorld()
 			local x,y,z = Spring.GetTeamStartPosition(t)
 			if x and x > 0 and z > 0 then
 				local groundType, _ = Spring.GetGroundInfo(x, z)
-				if groundType == "Sand" and restrictSand then
+				if sandType[groundType] and restrictSand then
 					gl.LineWidth(4)
 					local radius = 64
 					gl.DrawGroundCircle(x, y, z, radius, 16)

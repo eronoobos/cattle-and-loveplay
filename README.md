@@ -238,7 +238,8 @@ v6 -> v7
 - / spawn worms along the target box's average movement vector
 - / make sandType table, not single variable (to be used on Desert Needles and others)
 - / remove fast_rock and associated map options
-- make gui_start_alerts use sandType table, and find groundTypes more efficiently, a la the nearestSand fallback in sand_worms
+- / make gui_start_alerts use sandType table
+- make gui_start_alerts find groundTypes more efficiently, a la the nearestSand fallback in sand_worms
 - fix underworms being visible to spectators even when cloaked
 - don't do wormtarget or wormdirect to worms that have an emergedID
 - fix unitscript errors (check if piece is valid before exploding it?)
