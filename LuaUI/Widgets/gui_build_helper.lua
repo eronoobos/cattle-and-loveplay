@@ -10,14 +10,10 @@ function widget:GetInfo()
 	}
 end
 
-local fastRock = true
 local restrictSand = true
 local isNotValid
 
 function widget:Initialize()
-	if Spring.GetMapOptions().fast_rock == "0" then
-		fastRock = false
-	end
 	if Spring.GetMapOptions().restrict_sand_building == "0" then
 		restrictSand = false
 	end

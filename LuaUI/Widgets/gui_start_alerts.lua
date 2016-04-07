@@ -12,7 +12,6 @@ end
 
 local gameStarted = false
 
-local fastRock = true
 local restrictSand = true
 local sinkWrecks = true
 local areWorms = true
@@ -161,9 +160,6 @@ end
 function widget:Initialize()
 	local mapOptions = Spring.GetMapOptions()
 	if mapOptions then
-		if mapOptions.fast_rock == "0" then
-			fastRock = false
-		end
 		if mapOptions.restrict_sand_building == "0" then
 			restrictSand = false
 		end
@@ -174,7 +170,7 @@ function widget:Initialize()
 			areWorms = false
 		end
 	end
-	if not restrictSand and not fastRock and not sinkWrecks and not areWorms then
+	if not restrictSand and not sinkWrecks and not areWorms then
 		Spring.Echo("No map options have been enabled. Start Alerts widget has been disbled.")
 		widgetHandler:RemoveWidget()
 	else
@@ -198,7 +194,7 @@ function widget:Initialize()
 end
 
 function widget:DrawScreen()
-		if restrictSand or fastRock or sinkWrecks then
+		if restrictSand or sinkWrecks then
 		
 			if gameStarted and alertCounter == 0 then
 				widgetHandler:RemoveWidget()
@@ -260,34 +256,6 @@ function widget:DrawScreen()
 					end
 				end
 				
-			end
-			if fastRock then
-				gl.Color(0.8, 0.7, 0.6, 1)
-				myFont:Print("HIGH-TRACTION ROCK", alertX, viewY*0.2, 36, "rvno")
-				myFont:Print("HIGH-TRACTION ROCK", alertX, viewY*0.2, 36, "rvn")
-				myFont:Print("Movement on rock 125%.", alertX, viewY*0.16, 16, "rvo")
-				myFont:Print("Movement on rock 125%.", alertX, viewY*0.16, 16, "rv")
-				
-				local sx, sy
-				if sameCam and rockX then
-					sx, sy = rockX, rockY
-				else
-					sx, sy = findGroundType(true, "Rock", viewX*0.65, 16, viewX-16, viewY-16)
-					if not sx then
-						sx, sy = findGroundType(true, "Rock", viewX*0.15, viewY*0.3, viewX*0.65, viewY-16)
-					end
-					rockX = sx
-					rockY = sy
-				end
-				
-				if sx then
-					if sx > viewX*0.65 then
-						drawLandMarker(0.8, 0.7, 0.6, alertOpacity, viewX*0.61*alertSlide, viewY*0.2, sx, sy)
-					else
-						drawLandMarker(0.8, 0.7, 0.6, alertOpacity, viewX*0.61*alertSlide, viewY*0.2, sx, sy, viewX*0.65)
-					end
-				end
-
 			end
 			
 			if alertCounter > 0 then

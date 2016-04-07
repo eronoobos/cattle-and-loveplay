@@ -17,15 +17,6 @@ local options = {
 	},
 	
 	{
-		key	= 'fast_rock',
-		name	= 'Faster Movement on Rock',
-		desc	= 'Ground unit movement on the rock is 125% of normal.',
-		type	= 'bool',
-		section = '1_terrain_sect',
-		def	= 'true',
-	},
-	
-	{
 		key	= 'sink_wrecks',
 		name	= 'Wrecks Sink Into Sand',
 		desc	= 'Wrecks slowly sink into the sand (not really--they lose health).',
