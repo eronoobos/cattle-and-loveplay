@@ -43,7 +43,7 @@ local mexValue = -200 -- negative value = inaccuracy of targetting
 local hoverValue = -300 -- negative value = inaccuracy of targetting
 local commanderValue = -100 -- negative value = inaccuracy of targetting
 local wormSignFrequency = 20 -- average time in seconds between worm signs (varies + or - 50%)
-local sandType = "Sand" -- the ground type that worm spawns in
+local sandType = { ["Sand"] = true } -- the ground type that worm spawns in
 local wormEmergeUnitName = "sworm" -- what unit the worms emerge and attack as
 local rippleNumMin = 5
 local rippleNumMax = 10
@@ -251,7 +251,7 @@ local function getWormPathGraph(nodeSize)
 			for tx = cx, cx+nodeSize, testSize do
 				for tz = cz, cz+nodeSize, testSize do
 					local groundType = spGetGroundInfo(tx, tz)
-					if groundType ~= sandType then
+					if not sandType[groundType] then
 						sand = false
 						break
 					end
@@ -377,7 +377,7 @@ end
 
 local function nearestSand(x, z)
 	local groundType, _ = spGetGroundInfo(x, z)
-	if groundType == sandType then return x, z end
+	if sandType[groundType] then return x, z end
 	if wormReDir then
 		-- also clamps to map bounds
 		local cx = mMax(mMin(x, sizeX-halfCellSize), halfCellSize)
@@ -398,15 +398,13 @@ local function nearestRock(x, z, minDist, maxDist)
 	minDist = minDist or 16
 	maxDist = maxDist or 224
 	x, z = mapClampXZ(x, z)
-	local groundType, _ = spGetGroundInfo(x, z)
-	if groundType ~= sandType then return x, z end
+	if not sandType[spGetGroundInfo(x,z)] then return x, z end
 	-- search for rock
 	local ax, az, aa
 	for dist = minDist, maxDist, 16 do
 		for a = 0, twicePi, quarterPi do
 			local sx, sz = CirclePos(x, z, dist, a)
-			local groundType, _ = spGetGroundInfo(sx, sz)
-			if groundType ~= sandType then
+			if not sandType[spGetGroundInfo(sx,sz)] then
 				if not ax then
 					ax, az, aa = sx, sz, a
 				elseif mAbs(AngleDist(a, aa)) > halfPi*1.5 then
@@ -436,11 +434,8 @@ local function edibleUnit(emergedUnitID, uID)
 	-- spEcho("inedibleDefIDs?", inedibleDefIDs[uDefID])
 	if inedibleDefIDs[uDefID] then return end
 	local ux, uy, uz = spGetUnitPosition(uID)
-	local groundType, _ = spGetGroundInfo(ux, uz)
-	-- spEcho("ground type?", groundType)
-	if groundType ~= sandType then return end
-	local gy = spGetGroundHeight(ux, uz)
-	if uy - gy > biteHeight then return end
+	if not sandType[spGetGroundInfo(ux,uz)] then return end
+	if uy - spGetGroundHeight(ux,uz) > biteHeight then return end
 	return true
 end
 
@@ -566,7 +561,7 @@ local function wormTargetting()
 			local ux, uy, uz = spGetUnitBasePosition(uID)
 			local groundType, _ = spGetGroundInfo(ux, uz)
 			local groundHeight = spGetGroundHeight(ux, uz) 
-			if groundType == sandType and uy < groundHeight + biteHeight then
+			if sandType[groundType] and uy < groundHeight + biteHeight then
 				local uDefID = spGetUnitDefID(uID)
 				if not inedibleDefIDs[uDefID] then
 					local uDef = UnitDefs[uDefID]
@@ -782,7 +777,7 @@ local function signStampRipple(w, mult, lightning)
 				local sx = x + bx
 				local sz = z + bz
 				local gt, _ = spGetGroundInfo(sx, sz)
-				if gt == sandType then
+				if sandType[gt] then
 					local hmod = bh * hmodBase
 					addRipple(sx, sz, hmod)
 					if lightning then
@@ -851,7 +846,7 @@ local function signStamp(w)
 		for _, stamp in pairs(w.size.bulgeStamp) do
 			local sx, sz = x+stamp.x, z+stamp.z
 			local gt, _ = spGetGroundInfo(sx, sz)
-			if gt == sandType then
+			if sandType[gt] then
 				spAddHeightMap(x+stamp.x, z+stamp.z, stamp.h*bh)
 			end
 		end
@@ -870,7 +865,7 @@ local function clearOldStamps()
 				for _, stamp in pairs(old.stamp) do
 					local sx, sz = x+stamp.x, z+stamp.z
 					local gt, _ = spGetGroundInfo(sx, sz)
-					if gt == sandType then
+					if sandType[gt] then
 						spAddHeightMap(x+stamp.x, z+stamp.z, -(stamp.h*bh)/2)
 					end
 				end
@@ -879,7 +874,7 @@ local function clearOldStamps()
 				for _, stamp in pairs(old.stamp) do
 					local sx, sz = x+stamp.x, z+stamp.z
 					local gt, _ = spGetGroundInfo(sx, sz)
-					if gt == sandType then
+					if sandType[gt] then
 						spAddHeightMap(x+stamp.x, z+stamp.z, -(stamp.h*bh)/2)
 					end
 				end
@@ -1143,7 +1138,7 @@ local function doWormMovementAndRipple(gf, second)
 				local cegx = mapClampX(w.x + mRandom(w.size.diameter) - w.size.radius)
 				local cegz = mapClampZ(w.z + mRandom(w.size.diameter) - w.size.radius)
 				local groundType, _ = spGetGroundInfo(cegx, cegz)
-				if groundType == sandType then
+				if sandType[groundType] then
 					local cegy = spGetGroundHeight(cegx, cegz)
 					spSpawnCEG("sworm_dust",cegx,cegy,cegz,0,1,0,30,0)
 				end
@@ -1223,7 +1218,7 @@ local function doWormAttacks(gf, second)
 					if uSize <= w.size.maxMealSize then
 						local x, y, z = spGetUnitPosition(uID)
 						local groundType, _ = spGetGroundInfo(x, z)
-						if groundType == sandType then
+						if sandType[groundType] then
 							local uval = sandUnitValues[uDefID]
 							if uval > bestVal then
 								bestID = uID

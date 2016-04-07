@@ -236,7 +236,12 @@ v6 -> v7
 - / localize all Spring and math functions
 - / spawn worms near boxes far from the other worms
 - / spawn worms along the target box's average movement vector
-- update unitpic
+- / make sandType table, not single variable (to be used on Desert Needles and others)
+- fix underworms being visible to spectators even when cloaked
+- don't do wormtarget or wormdirect to worms that have an emergedID
+- fix unitscript errors (check if piece is valid before exploding it?)
+- add fallback AI build order redirection (using similar system of nearestSand fallback)
+- make sure both fallbacks work (wormredir and ai redir)
 - remove worm radar?
 - delete unecessary files
 - make lightning more efficient & less dumb looking by either using projectiles (beamlaser), or with opengl lines?

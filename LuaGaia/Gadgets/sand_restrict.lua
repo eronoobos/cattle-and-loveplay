@@ -14,7 +14,7 @@ local cellSize = 64
 local halfCellSize = cellSize / 2
 local sizeX = Game.mapSizeX 
 local sizeZ = Game.mapSizeZ
-local sandType = sandType
+local sandType = { ["Sand"] = true }
 
 -- these default values are changed in gadget:Initialize()
 local aiPresent = false
@@ -193,7 +193,7 @@ function gadget:AllowCommand(unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdO
 			if #cmdParams > 2 then
 				local bx, bz = cmdParams[1], cmdParams[3]
 				local groundType, _ = Spring.GetGroundInfo(bx, bz)
-				if groundType == sandType then
+				if sandType[groundType] then
 					local cx = bx - (bx % cellSize)
 					local cz = bz - (bz % cellSize)
 					local elmos = elmoMaxSize[-cmdID]
@@ -303,12 +303,18 @@ function gadget:GameFrame(gf)
             local hmod = (rmod - 16) * 0.001
             local jitterz = math.random(0, 32) - 16
             local jitterx = math.random(0, 32) - 16
-            typeA, _ = Spring.GetGroundInfo(x1-rmod+jitterx, z1-rmod+jitterz)
-            typeB, _ = Spring.GetGroundInfo(x1-rmod+jitterx, z1+rmod+jitterz)
-            typeC, _ = Spring.GetGroundInfo(x1+rmod+jitterx, z1-rmod+jitterz)
-            typeD, _ = Spring.GetGroundInfo(x1+rmod+jitterx, z1+rmod+jitterz)
-            if typeA == sandType and typeB == sandType and typeC == sandType and typeD == sandType then
-              Spring.AdjustHeightMap(x1-rmod+jitterx, z1-rmod+jitterz, x2+rmod+jitterx, z2+rmod+jitterz, hmod)
+            local ax, az = x1-rmod+jitterx, z1-rmod+jitterz
+            if sandType[Spring.GetGroundInfo(ax,az)] then
+            	local bx, bz = x1-rmod+jitterx, z1+rmod+jitterz
+            	if sandType[Spring.GetGroundInfo(bx,bz)] then
+            		local cx, cz = x1+rmod+jitterx, z1-rmod+jitterz
+            		if sandType[Spring.GetGroundInfo(cx,cz)] then
+            			local dx, dz = x1+rmod+jitterx, z1+rmod+jitterz
+            			if sandType[Spring.GetGroundInfo(dx,dz)] then
+            				Spring.AdjustHeightMap(ax, az, dx, dz, hmod)
+            			end
+            		end
+            	end
             end
           end
         else
@@ -350,7 +356,7 @@ function gadget:UnitCreated(unitID, unitDefID, teamID, builderID)
 	local x, y, z = Spring.GetUnitPosition(unitID)
 	if (x ~= nil) and (z ~= nil) then
 		local groundType, _ = Spring.GetGroundInfo(x, z)
-		if groundType == sandType then
+		if sandType[groundType] then
 			if (not builderID) then return true end   --no builder -> morph or something like that
 			if builderTeam == Spring.GetGaiaTeamID() then return true end
 			if isNotValid[unitDefID] then
@@ -406,7 +412,7 @@ function gadget:FeatureCreated(featureID, allyTeam)
 	local x, y, z = Spring.GetFeaturePosition(featureID)
 	if (x ~= nil) and (z ~= nil) then
 		local groundType, _ = Spring.GetGroundInfo(x, z)
-		if groundType == sandType then
+		if sandType[groundType] then
 			local fDefID = Spring.GetFeatureDefID(featureID)
 --			fSunkHeight[featureID] = y - FeatureDefs[fDefID].height
 			fSinkSpeed[featureID] = FeatureDefs[fDefID].maxHealth / 45
