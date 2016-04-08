@@ -16,6 +16,7 @@ local sizeX = Game.mapSizeX
 local sizeZ = Game.mapSizeZ
 local sandType = { ["Sand"] = true }
 local maxSlope = 0.25
+local buildSpacing = 16
 
 -- these default values are changed in gadget:Initialize()
 local aiPresent = false
@@ -233,10 +234,9 @@ end
 
 local function getBuildRedirect(bx, bz, uDefID)
 	if reDir and reReDir then return redirectFromMatrix(bx, bz, uDefID) end
-	Spring.Echo("using on the fly")
 	local uDef = UnitDefs[uDefID]
 	if not uDef then return end
-	local uSize = math.max(32, (math.max(uDef.xsize, uDef.zsize) * 8) % 32)
+	local uSize = ((math.max(uDef.xsize, uDef.zsize) * 16) + buildSpacing) % 32
 	local buildGraph = buildGraphs[uSize] or getBuildGraph(uSize)
 	if not buildGraphs[uSize] then buildGraphs[uSize] = buildGraph end
 	local buildNodeSize = buildNodeSizes[uSize] or ((uSize / 2)^2 * 2)
@@ -359,7 +359,6 @@ function gadget:AllowCommand(unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdO
 				local groundType, _ = Spring.GetGroundInfo(bx, bz)
 				if sandType[groundType] then
 					local x, z, bface = getBuildRedirect(bx, bz, -cmdID)
-					Spring.Echo(x, z, bface)
 					if x then
 						occupyThis = { unitID, unitTeam, uDefID }
 						Spring.GiveOrderToUnit(unitID, cmdID, {x, Spring.GetGroundHeight(x,z), z, bface}, cmdOpts)

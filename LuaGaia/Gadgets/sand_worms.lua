@@ -1129,8 +1129,8 @@ local function doWormMovementAndRipple(gf, second)
 			rippleMult = 0.2
 		end
 		if rippleMult then
-			signStampRipple(w, rippleMult, lightning)
-			if mRandom() < rippleMult * 0.2 then
+			-- signStampRipple(w, rippleMult, lightning)
+			if mRandom() < rippleMult * 0.3 then
 				local cegx = mapClampX(w.x + mRandom(w.size.diameter) - w.size.radius)
 				local cegz = mapClampZ(w.z + mRandom(w.size.diameter) - w.size.radius)
 				local groundType, _ = spGetGroundInfo(cegx, cegz)
@@ -1138,6 +1138,7 @@ local function doWormMovementAndRipple(gf, second)
 					local cegy = spGetGroundHeight(cegx, cegz)
 					spSpawnCEG("sworm_dust",cegx,cegy,cegz,0,1,0,30,0)
 				end
+				if lightning and mRandom() < 0.5 then wormLittleSign(w, cegx, cegz) end
 			end
 		end
 		if w.emergedID and mRandom() < 0.01 then
@@ -1301,12 +1302,12 @@ function gadget:GameFrame(gf)
 	end	
 
 	if gf % 4 == 0 then
-		signUnRippleExpand()
+		-- signUnRippleExpand()
 		-- clearOldStamps()
 	end
 
 	doWormMovementAndRipple(gf, second) -- worm movement and ground ripple
-	writeNewRipples()
+	-- writeNewRipples()
 
 	evalCycle(gf, second) -- unit evaluation cycle
 
