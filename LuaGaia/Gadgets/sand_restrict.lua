@@ -15,6 +15,7 @@ local halfCellSize = cellSize / 2
 local sizeX = Game.mapSizeX 
 local sizeZ = Game.mapSizeZ
 local sandType = { ["Sand"] = true }
+local maxSlope = 0.25
 
 -- these default values are changed in gadget:Initialize()
 local aiPresent = false
@@ -28,6 +29,9 @@ local elmoMaxSize
 local isOccupied 
 local occupyThis
 local unitOccupies
+local unitOccupiesNodes = {}
+local buildNodeSizes = {}
+local buildGraphs = {}
 
 -- doInit() will set this to a list of unit def IDs that can't be built on sand    
 local isNotValid = {}
@@ -83,6 +87,10 @@ local function doInit()
 end
 
 local function loadReDir()
+	if not VFS.FileExists('data/redirect_sizes.lua') or not VFS.FileExists('data/build_redirect_matrix.u8') then
+		Sping.Echo("no redirect matrix files exist")
+		return
+	end
 	local reDirSizes = VFS.Include('data/redirect_sizes.lua')
 --	Spring.Echo("reDir size", reDirSizes[1])
 	local reDirRead = VFS.LoadFile('data/build_redirect_matrix.u8')
@@ -105,6 +113,10 @@ local function loadReDir()
 end
 
 local function loadReReDir()
+	if not VFS.FileExists('data/redirect_sizes.lua') or not VFS.FileExists('data/redirect_redirect_matrix.u8') then
+		Sping.Echo("no redirect redirect matrix files exist")
+		return
+	end
 	local reDirSizes = VFS.Include('data/redirect_sizes.lua')
 --	Spring.Echo("reReDir size", reDirSizes[2])
 	local reReDirRead = VFS.LoadFile('data/redirect_redirect_matrix.u8')
@@ -131,6 +143,152 @@ local function loadReReDir()
 	return reReDir
 end
 
+local function redirectFromMatrix(bx, bz, uDefID)
+	local cx = bx - (bx % cellSize)
+	local cz = bz - (bz % cellSize)
+	local elmos = elmoMaxSize[uDefID]
+	if not elmos or not reDir[elmos] or not reDir[elmos][cx] or not reDir[elmos][cx][cz] then
+		return
+	end
+	-- Spring.Echo("reDir entry for ", elmos, cx, cz, " found")
+	local bface = reDir[elmos][cx][cz][3]
+	local rx = reDir[elmos][cx][cz][1]
+	local rz = reDir[elmos][cx][cz][2]
+	local x = rx + halfCellSize
+	local z = rz + halfCellSize
+	local y = Spring.GetGroundHeight(x, z)
+	local blocked = Spring.TestBuildOrder(uDefID, x, y, z, bface)
+	local spotFound = false
+	if isOccupied[rx] == nil then isOccupied[rx] = {} end
+	if not isOccupied[rx][rz] and blocked > 0 then
+		--Spring.Echo("spot not occupied")
+		spotFound = true
+	else
+		-- Spring.Echo("spot occupied")
+		for i = 1, 16 do
+			bface = reReDir[elmos][rx][rz][i][3]
+			local rrx = reReDir[elmos][rx][rz][i][1]
+			local rrz = reReDir[elmos][rx][rz][i][2]
+			x = rrx + halfCellSize
+			z = rrz + halfCellSize
+			y = Spring.GetGroundHeight(x, z)
+			blocked = Spring.TestBuildOrder(uDefID, x, y, z, bface)
+			if isOccupied[rrx] == nil then isOccupied[rrx] = {} end
+			if not isOccupied[rrx][rrz] and blocked > 0 then
+				spotFound = true
+				-- Spring.Echo("new unoccupied spot found")
+				break
+			end
+		end
+	end
+	if spotFound then
+		return x, z, bface
+	end
+end
+
+local function valid_node_func(node)
+	return not node.occupied
+end
+
+local function getBuildGraph(nodeSize)
+	local halfNodeSize = nodeSize / 2
+	local testSize = 16
+	local graph = {}
+	local id = 1
+	for cx = 0, sizeX-nodeSize, nodeSize do
+		local x = cx + halfNodeSize
+		for cz = 0, sizeZ-nodeSize, nodeSize do
+			local z = cz + halfNodeSize
+			local buildable = true
+			for tx = cx, cx+nodeSize, testSize do
+				for tz = cz, cz+nodeSize, testSize do
+					local groundType = spGetGroundInfo(tx, tz)
+					if sandType[groundType] then
+						buildable = false
+						break
+					else
+						local _, _, _, slope = Spring.GetGroundNormal(tx, tz)
+						if slope > maxSlope then
+							buildable = false
+							break
+						end
+					end
+				end
+				if not buildable then break end
+			end
+			if buildable then
+				local node = { x = x, y = z, id = id}
+				id = id + 1
+				tInsert(graph, node)
+				-- spMarkerAddPoint(x, 100, z, nodeSize)
+			end
+		end
+	end
+	return graph
+end
+
+local function getBuildRedirect(bx, bz, uDefID)
+	if reDir and reReDir then return redirectFromMatrix end
+	local uDef = UnitDefs[uDefID]
+	if uDef then return end
+	local uSize = math.max(32, (math.max(uDef.xsize, uDef.zsize) * 8) % 32)
+	local buildGraph = buildGraphs[uSize] or getBuildGraph(uSize)
+	if not buildGraphs[uSize] then buildGraphs[uSize] = buildGraph end
+	local buildNodeSize = buildNodeSizes[uSize] or ((uSize / 2)^2 * 2)
+	if not buildNodeSizes[uSize] then buildNodeSizes[uSize] = buildNodeSize
+	local node = astar.nearest_node(bx, bz, buildGraph, buildNodeSize, valid_node_func)
+	if node then
+		return node.x, node.z, math.random(1, 4)
+	end
+end
+
+local function occupyReDirSpot(unitID, unitDefID)
+	local x, y, z = Spring.GetUnitPosition(unitID)
+	cx = x - (x % cellSize)
+	cz = z - (z % cellSize)
+	isOccupied[cx][cz] = true
+	unitOccupies[unitID] = { [0]={cx,cz} }
+	if isFactory[unitDefID] then
+		local dx = { [0]=0, [1]=1, [2]=0, [3]=-1 }
+		local dz = { [0]=1, [1]=0, [2]=-1, [3]=0 }
+		for d=cellSize, cellsize*3, cellSize do
+			local ox
+			local oz
+			if dx[bface] == 0 then
+				oz = cz + d*dz[bface]
+				ox = cx
+				isOccupied[ox-cellSize][oz] = true
+				table.insert(unitOccupies[unitID], {ox-cellSize, oz})
+				isOccupied[ox][oz] = true
+				table.insert(unitOccupies[unitID], {ox, oz})
+				isOccupied[ox+cellSize][oz] = true
+				table.insert(unitOccupies[unitID], {ox+cellSize, oz})
+			elseif dz[bface] == 0 then
+				ox = cx + d*dx[bface]
+				oz = cz
+				isOccupied[ox][oz-cellSize] = true
+				table.insert(unitOccupies[unitID], {ox, oz-cellSize})
+				isOccupied[ox][oz] = true
+				table.insert(unitOccupies[unitID], {ox, oz})
+				isOccupied[ox][oz+cellSize] = true
+				table.insert(unitOccupies[unitID], {ox, oz+cellSize})
+			end
+		end
+	end
+end
+
+local function occupyBuildSpot(unitID, unitDefID)
+	if reDir and reReDir then return occupyReDirSpot(unitID, unitDefID)
+	local x, y, z = Spring.GetUnitPosition(unitID)
+	unitOccupiesNodes[unitID] = {}
+	for uSize, buildGraph in pairs(buildGraphs) do
+		local node = astar.nearest_node(x, z, buildNodeSizes[uSize])
+		if node then
+			node.occupied = true
+			table.insert(unitOccupiesNodes[unitID], node)
+		end
+	end
+end
 
 -- synced
 if gadgetHandler:IsSyncedCode() then
@@ -166,6 +324,9 @@ function gadget:Initialize()
 		Spring.Echo("AI present. Loading build redirection matrix...")
 		reDir = loadReDir()
 		reReDir = loadReReDir()
+		if not reDir or not reReDir then
+			Spring.Echo("using on the fly build redirection")
+		end
 		isOccupied = {}
 		occupyThis = {}
 		unitOccupies = {}
@@ -184,73 +345,24 @@ function gadget:GameStart()
 end
 
 function gadget:AllowCommand(unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdOpts, cmdTag, synced)
-	if not restrictSand then
-		return true
-	end
-	if aiPresent then
+	if aiPresent and restrictSand then
 		local teamInfo = { Spring.GetTeamInfo(unitTeam) }
 		if teamInfo[4] and isNotValid[-cmdID] then
 			if #cmdParams > 2 then
 				local bx, bz = cmdParams[1], cmdParams[3]
 				local groundType, _ = Spring.GetGroundInfo(bx, bz)
 				if sandType[groundType] then
-					local cx = bx - (bx % cellSize)
-					local cz = bz - (bz % cellSize)
-					local elmos = elmoMaxSize[-cmdID]
-					if reDir[elmos] and reDir[elmos][cx] and reDir[elmos][cx][cz] ~= nil then
-	--					Spring.Echo("reDir entry for ", elmos, cx, cz, " found")
-						local bface = reDir[elmos][cx][cz][3]
-						local rx = reDir[elmos][cx][cz][1]
-						local rz = reDir[elmos][cx][cz][2]
-						local x = rx + halfCellSize
-						local z = rz + halfCellSize
-						local y = Spring.GetGroundHeight(x, z)
-						local blocked = Spring.TestBuildOrder(-cmdID, x, y, z, bface)
-						local spotFound = false
-						if isOccupied[rx] == nil then isOccupied[rx] = {} end
-						if not isOccupied[rx][rz] and blocked > 0 then
-	--						Spring.Echo("spot not occupied")
-							spotFound = true
-						else
-	--						Spring.Echo("spot occupied")
-							for i = 1, 16 do
-								bface = reReDir[elmos][rx][rz][i][3]
-								local rrx = reReDir[elmos][rx][rz][i][1]
-								local rrz = reReDir[elmos][rx][rz][i][2]
-								x = rrx + halfCellSize
-								z = rrz + halfCellSize
-								y = Spring.GetGroundHeight(x, z)
-								blocked = Spring.TestBuildOrder(-cmdID, x, y, z, bface)
-								if isOccupied[rrx] == nil then isOccupied[rrx] = {} end
-								if not isOccupied[rrx][rrz] and blocked > 0 then
-									spotFound = true
-	--								Spring.Echo("new unoccupied spot found")
-									break
-								end
-							end
-						end
-						if spotFound then
-		--					Spring.MarkerAddPoint(x, y, z)
-							occupyThis = { unitID, unitTeam, -cmdID }
-							Spring.GiveOrderToUnit(unitID, cmdID, {x, y, z, bface}, cmdOpts)
-							return false
-						else
-							return true
-						end
-					else
-	--					Spring.Echo("NO reDir entry for ", elmos, cx, cz, " found")
-						return true
+					local x, z, bface = getBuildRedirect(bx, bz, -cmdID)
+					if x then
+						occupyThis = { unitID, unitTeam, uDefID }
+						Spring.GiveOrderToUnit(unitID, cmdID, {x, Spring.GetGroundHeight(x,z), z, bface}, cmdOpts)
+						return false
 					end
-				else
-					return true
 				end
 			end
-		else
-			return true
 		end
-	else
-		return true
 	end
+	return true
 end
 
 function gadget:UnitDestroyed(unitID, unitDefID, teamID, attackerID, attackerDefID, attackerTeamID)
@@ -270,6 +382,12 @@ function gadget:UnitDestroyed(unitID, unitDefID, teamID, attackerID, attackerDef
 			isOccupied[ox][oz] = false
 		  end
 		  unitOccupies[unitID] = nil
+		end
+		if unitOccupiesNodes[unitID] then
+			for _, node in pairs(unitOccupiesNodes) then
+				node.occupied = nil
+			end
+			unitOccupiesNodes[unitID] = nil
 		end
     end
   end
@@ -371,38 +489,7 @@ function gadget:UnitCreated(unitID, unitDefID, teamID, builderID)
 	end
 	
 	if occupyThis == { builderID, teamID, unitDefID } then
-		local x, y, z = Spring.GetUnitPosition(unitID)
-		cx = x - (x % cellSize)
-		cz = z - (z % cellSize)
-		isOccupied[cx][cz] = true
-		unitOccupies[unitID] = { [0]={cx,cz} }
-		if isFactory[-cmdID] then
-			local dx = { [0]=0, [1]=1, [2]=0, [3]=-1 }
-			local dz = { [0]=1, [1]=0, [2]=-1, [3]=0 }
-			for d=cellSize, cellsize*3, cellSize do
-				local ox
-				local oz
-				if dx[bface] == 0 then
-					oz = cz + d*dz[bface]
-					ox = cx
-					isOccupied[ox-cellSize][oz] = true
-					table.insert(unitOccupies[unitID], {ox-cellSize, oz})
-					isOccupied[ox][oz] = true
-					table.insert(unitOccupies[unitID], {ox, oz})
-					isOccupied[ox+cellSize][oz] = true
-					table.insert(unitOccupies[unitID], {ox+cellSize, oz})
-				elseif dz[bface] == 0 then
-					ox = cx + d*dx[bface]
-					oz = cz
-					isOccupied[ox][oz-cellSize] = true
-					table.insert(unitOccupies[unitID], {ox, oz-cellSize})
-					isOccupied[ox][oz] = true
-					table.insert(unitOccupies[unitID], {ox, oz})
-					isOccupied[ox][oz+cellSize] = true
-					table.insert(unitOccupies[unitID], {ox, oz+cellSize})
-				end
-			end
-		end
+		occupyBuildSpot(unitID, unitDefID, teamID, builderID)
 		occupyThis = {}
 	end
 end

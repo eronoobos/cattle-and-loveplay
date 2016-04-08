@@ -52,7 +52,11 @@ local function heuristic_cost_estimate ( nodeA, nodeB )
 	return dist ( nodeA.x, nodeA.y, nodeB.x, nodeB.y )
 end
 
-local function is_valid_node ( node, neighbor )
+local function is_valid_node ( node )
+	return true
+end
+
+local function is_neighbor_node ( node, neighbor )
 	return true
 end
 
@@ -71,7 +75,7 @@ local function neighbor_nodes ( theNode, nodes )
 	if theNode.neighbors then return theNode.neighbors end -- use cached neighbors
 	local neighbors = {}
 	for _, node in ipairs ( nodes ) do
-		if theNode ~= node and is_valid_node ( theNode, node ) then
+		if theNode ~= node and is_valid_node ( node ) and is_neighbor_node ( theNode, node ) then
 			table.insert ( neighbors, node )
 		end
 	end
@@ -109,12 +113,13 @@ end
 -- pathfinding functions
 ----------------------------------------------------------------
 
-local function a_star ( start, goal, nodes, valid_node_func )
+local function a_star ( start, goal, nodes, neighbor_node_func, valid_node_func )
 
 	local closedset = {}
 	local openset = { start }
 	local came_from = {}
 
+	if neighbor_node_func then is_neighbor_node = neighbor_node_func end
 	if valid_node_func then is_valid_node = valid_node_func end
 
 	local g_score, f_score = {}, {}
@@ -171,29 +176,43 @@ function astar.distance ( x1, y1, x2, y2 )
 	return dist ( x1, y1, x2, y2 )
 end
 
-function astar.find_node ( x, y, nodes )
+function astar.find_node ( x, y, nodes, valid_node_func )
+	if valid_node_func then
+		is_valid_node = valid_node_func
+	else
+		is_valid_node = function() return true end
+	end
 	for _, node in ipairs ( nodes ) do
-		if node.x == x and node.y == y then
-			return node
+		if is_valid_node(node) then
+			if node.x == x and node.y == y then
+				return node
+			end
 		end
 	end
 end
 
-function astar.nearest_node( x, y, nodes, nodeDist )
+function astar.nearest_node( x, y, nodes, nodeDist, valid_node_func )
+	if valid_node_func then
+		is_valid_node = valid_node_func
+	else
+		is_valid_node = function() return true end
+	end
 	local bestDist
 	local bestNode
 	for _, node in ipairs ( nodes ) do
-		local d = dist(x, y, node.x, node.y)
-		if not bestDist or d < bestDist then
-			bestDist = d
-			bestNode = node
-			if nodeDist and d < nodeDist then break end
+		if is_valid_node(node) then
+			local d = dist(x, y, node.x, node.y)
+			if not bestDist or d < bestDist then
+				bestDist = d
+				bestNode = node
+				if nodeDist and d < nodeDist then break end
+			end
 		end
 	end
 	return bestNode
 end
 
-function astar.path ( start, goal, nodes, ignore_cache, valid_node_func )
+function astar.path ( start, goal, nodes, ignore_cache, neighbor_node_func, valid_node_func )
 	if not cachedPaths then cachedPaths = {} end
 	if not cachedPaths [ start ] then
 		cachedPaths [ start ] = {}
@@ -201,7 +220,7 @@ function astar.path ( start, goal, nodes, ignore_cache, valid_node_func )
 		return cachedPaths [ start ] [ goal ]
 	end
 	
-	return a_star ( start, goal, nodes, valid_node_func )
+	return a_star ( start, goal, nodes, neighbor_node_func, valid_node_func )
 end
 
 return astar
