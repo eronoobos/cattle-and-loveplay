@@ -45,6 +45,10 @@ local fSinkCount = 0
 local fSinkSpeed = {}
 --local fSunkHeight --not needed unless wrecks actually sinking is possible
 
+local astar
+
+local spGetGroundInfo = Spring.GetGroundInfo
+local tInsert = table.insert
 
 -- local functions
 
@@ -228,17 +232,18 @@ local function getBuildGraph(nodeSize)
 end
 
 local function getBuildRedirect(bx, bz, uDefID)
-	if reDir and reReDir then return redirectFromMatrix end
+	if reDir and reReDir then return redirectFromMatrix(bx, bz, uDefID) end
+	Spring.Echo("using on the fly")
 	local uDef = UnitDefs[uDefID]
-	if uDef then return end
+	if not uDef then return end
 	local uSize = math.max(32, (math.max(uDef.xsize, uDef.zsize) * 8) % 32)
 	local buildGraph = buildGraphs[uSize] or getBuildGraph(uSize)
 	if not buildGraphs[uSize] then buildGraphs[uSize] = buildGraph end
 	local buildNodeSize = buildNodeSizes[uSize] or ((uSize / 2)^2 * 2)
-	if not buildNodeSizes[uSize] then buildNodeSizes[uSize] = buildNodeSize
+	if not buildNodeSizes[uSize] then buildNodeSizes[uSize] = buildNodeSize end
 	local node = astar.nearest_node(bx, bz, buildGraph, buildNodeSize, valid_node_func)
 	if node then
-		return node.x, node.z, math.random(1, 4)
+		return node.x, node.y, math.random(1, 4)
 	end
 end
 
@@ -278,7 +283,7 @@ local function occupyReDirSpot(unitID, unitDefID)
 end
 
 local function occupyBuildSpot(unitID, unitDefID)
-	if reDir and reReDir then return occupyReDirSpot(unitID, unitDefID)
+	if reDir and reReDir then return occupyReDirSpot(unitID, unitDefID) end
 	local x, y, z = Spring.GetUnitPosition(unitID)
 	unitOccupiesNodes[unitID] = {}
 	for uSize, buildGraph in pairs(buildGraphs) do
@@ -294,6 +299,7 @@ end
 if gadgetHandler:IsSyncedCode() then
 
 function gadget:Initialize()
+	astar = VFS.Include('a-star-lua/a-star.lua')
 	local mapOptions = Spring.GetMapOptions()
 	if mapOptions then
 		if mapOptions.restrict_sand_building == "0" then
@@ -322,10 +328,10 @@ function gadget:Initialize()
 	
 	if aiPresent then
 		Spring.Echo("AI present. Loading build redirection matrix...")
-		reDir = loadReDir()
-		reReDir = loadReReDir()
+		-- reDir = loadReDir()
+		-- reReDir = loadReReDir()
 		if not reDir or not reReDir then
-			Spring.Echo("using on the fly build redirection")
+			-- Spring.Echo("using on the fly build redirection")
 		end
 		isOccupied = {}
 		occupyThis = {}
@@ -353,6 +359,7 @@ function gadget:AllowCommand(unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdO
 				local groundType, _ = Spring.GetGroundInfo(bx, bz)
 				if sandType[groundType] then
 					local x, z, bface = getBuildRedirect(bx, bz, -cmdID)
+					Spring.Echo(x, z, bface)
 					if x then
 						occupyThis = { unitID, unitTeam, uDefID }
 						Spring.GiveOrderToUnit(unitID, cmdID, {x, Spring.GetGroundHeight(x,z), z, bface}, cmdOpts)
@@ -384,7 +391,7 @@ function gadget:UnitDestroyed(unitID, unitDefID, teamID, attackerID, attackerDef
 		  unitOccupies[unitID] = nil
 		end
 		if unitOccupiesNodes[unitID] then
-			for _, node in pairs(unitOccupiesNodes) then
+			for _, node in pairs(unitOccupiesNodes) do
 				node.occupied = nil
 			end
 			unitOccupiesNodes[unitID] = nil
@@ -509,8 +516,7 @@ function gadget:FeatureCreated(featureID, allyTeam)
 end
 
 function gadget:UnitFinished(unitID, unitDefID, teamID)
-  if restrictSand then
-    if sinkUnit[unitID] then
+	if restrictSand and sinkUnit[unitID] then
           local x, y, z = Spring.GetUnitPosition(unitID)
           local groundHeight = Spring.GetGroundHeight(x, z)
           local height = UnitDefs[unitDefID].height
@@ -524,9 +530,7 @@ function gadget:UnitFinished(unitID, unitDefID, teamID)
           local xRot = (math.random() - 0.5) / 1500
           local zRot = (math.random() - 0.5) / 1500
           Spring.MoveCtrl.SetRotationVelocity(unitID, xRot, 0.00, zRot)
-          
           sinkUnit[unitID] = nil
-    end
 	end
 end
 

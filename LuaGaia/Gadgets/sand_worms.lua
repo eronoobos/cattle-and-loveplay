@@ -1099,7 +1099,7 @@ local function wormAttack(targetID, wID)
 	local attackerID = spCreateUnit(w.size.unitName, x, y, z, 0, gaiaTeam, false)
 	if w.underUnitID then
 		-- hide underworm
-		spMoveCtrlSetPosition(w.x, -5000, w.z)
+		spMoveCtrlSetPosition(w.underUnitID, w.x, -5000, w.z)
 	end
 	isEmergedWorm[attackerID] = wID
 	w.emergedID = attackerID
@@ -1243,7 +1243,7 @@ if gadgetHandler:IsSyncedCode() then
 function gadget:Initialize()
 	spMoveCtrlEnable = Spring.MoveCtrl.Enable
 	spMoveCtrlSetVelocity = Spring.MoveCtrl.SetVelocity
-	spMoveCtrlSetPosition = Spring.MoveCtrlSetPosition
+	spMoveCtrlSetPosition = Spring.MoveCtrl.SetPosition
 	GG.wormEdibleUnit = edibleUnit
 	local mapOptions = spGetMapOptions()
 	if mapOptions then

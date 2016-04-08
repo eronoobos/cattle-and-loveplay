@@ -242,9 +242,10 @@ v6 -> v7
 - / make gui_start_alerts find groundTypes more efficiently, a la the nearestSand fallback in sand_worms
 - / don't do wormtarget or wormdirect to worms that have an emergedID
 - / fix underworms being visible to spectators even when cloaked
-- fix unitscript errors (check if piece is valid before exploding it?)
-- add fallback AI build order redirection (using similar system of nearestSand fallback)
+- / add fallback AI build order redirection (using similar system of nearestSand fallback)
 - make sure both fallbacks work (wormredir and ai redir)
+- are ripple signs too expensive?
+- fix unitscript errors (check if piece is valid before exploding it?)
 - remove worm radar?
 - delete unecessary files
 - make lightning more efficient & less dumb looking by either using projectiles (beamlaser), or with opengl lines?
