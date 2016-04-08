@@ -240,8 +240,8 @@ v6 -> v7
 - / remove fast_rock and associated map options
 - / make gui_start_alerts use sandType table
 - / make gui_start_alerts find groundTypes more efficiently, a la the nearestSand fallback in sand_worms
-- fix underworms being visible to spectators even when cloaked
-- don't do wormtarget or wormdirect to worms that have an emergedID
+- / don't do wormtarget or wormdirect to worms that have an emergedID
+- / fix underworms being visible to spectators even when cloaked
 - fix unitscript errors (check if piece is valid before exploding it?)
 - add fallback AI build order redirection (using similar system of nearestSand fallback)
 - make sure both fallbacks work (wormredir and ai redir)

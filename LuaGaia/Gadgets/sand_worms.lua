@@ -23,7 +23,7 @@ local movementPerWormAnger = 100000 / wormAggression -- how much total movement 
 local unitsPerWormAnger = 500 / wormAggression
 
 -- non mapoption config
-local wormRadarFlashMin, wormRadarFlashMax = 30, 180 -- how many frames between worm going in an out of stealth?
+local sandType = { ["Sand"] = true } -- the ground type that worm spawns in
 local wormEmergeUnitNames = { 
 	["sworm1"] = 1,
 	["sworm2"] = 2,
@@ -43,8 +43,6 @@ local mexValue = -200 -- negative value = inaccuracy of targetting
 local hoverValue = -300 -- negative value = inaccuracy of targetting
 local commanderValue = -100 -- negative value = inaccuracy of targetting
 local wormSignFrequency = 20 -- average time in seconds between worm signs (varies + or - 50%)
-local sandType = { ["Sand"] = true } -- the ground type that worm spawns in
-local wormEmergeUnitName = "sworm" -- what unit the worms emerge and attack as
 local rippleNumMin = 5
 local rippleNumMax = 10
 local bulgeSize = 7
@@ -158,6 +156,7 @@ local spGiveOrderToUnit = Spring.GiveOrderToUnit
 -- localizations that must be set in Initialize
 local spMoveCtrlEnable
 local spMoveCtrlSetVelocity
+local spMoveCtrlSetPosition
 
 -- functions
 
@@ -498,7 +497,7 @@ end
 
 local function giveTargetToWorms(uID, uSize, uval, ux, uz, dx, dz)
 	for wID, w in pairs(worm) do
-		if not w.size.badTargets[uID] and uSize <= w.size.maxMealSize then
+		if not w.emergedID and not w.size.badTargets[uID] and uSize <= w.size.maxMealSize then
 			local x = w.x
 			local z = w.z
 			local distx = mAbs(ux - x)
@@ -898,6 +897,7 @@ local function wormMoveUnderUnit(w)
 end
 
 local function wormDirect(w)
+	if w.emergedID then return end
 	if not w.tx then
 		-- spEcho("no target, using random target")
 		w.tx, w.tz = nearestSand(mRandom(halfCellSize, sizeX-halfCellSize), mRandom(halfCellSize, sizeZ-halfCellSize))
@@ -1033,7 +1033,8 @@ local function wormSpawn(x, z)
 			size = wormSizes[size],
 			underUnitID = spCreateUnit(wormUnderUnitName, spawnX, spGetGroundHeight(spawnX, spawnZ), spawnZ, 0, gaiaTeam),
 		}
-		spSetUnitRadiusAndHeight(w.underUnitID, mCeil(w.size.radius*0.8), mCeil(w.size.radius*0.1))
+		-- spSetUnitRadiusAndHeight(w.underUnitID, mCeil(w.size.radius*0.8), mCeil(w.size.radius*0.1))
+		Spring.SetUnitMaxHealth(w.underUnitID, uDef.health)
 		spMoveCtrlEnable(w.underUnitID)
 		-- spSetUnitCollisionVolumeData( w.underUnitID,
 		-- 	w.size.diameter, w.size.radius, w.size.diameter,
@@ -1097,9 +1098,8 @@ local function wormAttack(targetID, wID)
 	local unitTeam = spGetUnitTeam(targetID)
 	local attackerID = spCreateUnit(w.size.unitName, x, y, z, 0, gaiaTeam, false)
 	if w.underUnitID then
-		spSetUnitHealth(attackerID, spGetUnitHealth(w.underUnitID))
-		spSetUnitStealth(w.underUnitID, true)
-		spGiveOrderToUnit(w.underUnitID, CMD.CLOAK, {1}, {})
+		-- hide underworm
+		spMoveCtrlSetPosition(w.x, -5000, w.z)
 	end
 	isEmergedWorm[attackerID] = wID
 	w.emergedID = attackerID
@@ -1243,6 +1243,7 @@ if gadgetHandler:IsSyncedCode() then
 function gadget:Initialize()
 	spMoveCtrlEnable = Spring.MoveCtrl.Enable
 	spMoveCtrlSetVelocity = Spring.MoveCtrl.SetVelocity
+	spMoveCtrlSetPosition = Spring.MoveCtrlSetPosition
 	GG.wormEdibleUnit = edibleUnit
 	local mapOptions = spGetMapOptions()
 	if mapOptions then
@@ -1314,11 +1315,6 @@ function gadget:GameFrame(gf)
 		for wID, w in pairs(worm) do
 			wormDirect(w)
 			wormMoveUnderUnit(w) -- catch up worm under unit to current worm position
-			-- if not w.emergedID and (not w.nextRadarToggle or gf >= w.nextRadarToggle) then
-			-- 	w.stealth = not w.stealth
-			-- 	if w.underUnitID then spSetUnitStealth(w.underUnitID, w.stealth) end
-			-- 	w.nextRadarToggle = gf + mRandom(wormRadarFlashMin, wormRadarFlashMax)
-			-- end
 		end
 	end
 
@@ -1397,10 +1393,9 @@ function gadget:UnitDestroyed(unitID, unitDefID, teamID, attackerID, attackerDef
 				-- worm appatite whetted
 				w.tx, w.tz = nil, nil
 				w.endSecond = spGetGameSeconds() + baseWormDuration
-				if w.underUnitID then
+				if w.underUnit then
 					spSetUnitHealth(w.underUnitID, spGetUnitHealth(unitID))
-					spSetUnitStealth(w.underUnitID, false)
-					spGiveOrderToUnit(w.underUnitID, CMD.CLOAK, {0}, {})
+					spMoveCtrlSetPosition(w.underUnitID, w.x, spGetGroundHeight(w.x, w.z), w.z)
 				end
 				wormDirect(w)
 			end
