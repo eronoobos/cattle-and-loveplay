@@ -14,7 +14,7 @@ local wormUnits = {
 	["sworm2"] = 2,
 	["sworm3"] = 3,
 	["sworm4"] = 4, }
-local sandType = "Sand" -- the ground type that worm spawns in
+local sandType = { ["Sand"] = true } -- the ground type that worm spawns in
 
 -- set based on unit definition in script.Create()
 local unitDef
@@ -131,17 +131,20 @@ local function ComeToMe(uID, x, y, z)
 	end
 end
 
-local function Swallow(doomedByDist)
+local function Swallow(doomedByDist, edibleUnitIDs)
 	if not doomedByDist then return end
 	local mealIDs = {}
 	local mealDefsByID = {}
 	local awayIDs = {}
 	local mealSize = 0
 	for dist, uID in pairsByKeys(doomedByDist) do
+		-- Spring.Echo(dist, uID, mealSize, maxMealSize)
 		local awayWithYou = true
 		if mealSize < maxMealSize then
-			local edible = GG.wormEdibleUnit(unitID, uID)
+			local edible = edibleUnitIDs[uID] -- GG.wormEdibleUnit(unitID, uID)
+			-- Spring.Echo(edible, uID, unitID)
 			if edible then
+				-- Spring.Echo(uID, "is edible swallow")
 				local uDef = GetUnitDef(uID)
 				if uDef then
 					local uSize = math.ceil(uDef.radius)
@@ -161,6 +164,7 @@ local function Swallow(doomedByDist)
 			table.insert(awayIDs, uID)
 		end
 	end
+	-- Spring.Echo(#mealIDs, "mealIDs")
 	if #mealIDs == 0 then return end
 	local x,y,z = Spring.GetUnitBasePosition(unitID)
 
@@ -266,7 +270,7 @@ function script.Create()
 	unitDef = GetUnitDef(unitID)
 	modelHeight = unitDef.height
 	modelRadius = unitDef.radius
-	maxMealSize = math.ceil(unitDef.radius) * 0.888
+	maxMealSize = math.ceil(unitDef.radius * 0.888)
 	-- maxMealSize = mCeil(0.6 * (unitDef.height * unitDef.radius))
 	doomRadius = mFloor(modelRadius * 1.8)
 	-- Spring.Echo("sworm created", modelHeight, modelRadius, maxMealSize, doomRadius)
@@ -290,20 +294,29 @@ function script.Create()
 		local nearunits = Spring.GetUnitsInSphere(x,y,z, doomRadius)
 		if nearunits then
 			local unitsToSwallow = {}
+			local edibleUnitIDs = {}
 			local numToSwallow = 0
 			for _, uID in ipairs (nearunits) do
-				local ux, uy, uz = Spring.GetUnitPosition(uID)
-				local groundType, _ = Spring.GetGroundInfo(ux, uz)
-				if groundType == sandType then
-					local dist = Spring.GetUnitSeparation(unitID, uID, true)
-					unitsToSwallow[mCeil(dist)] = uID
-					local edible = GG.wormEdibleUnit(unitID, uID)
-					if edible then
-						numToSwallow = numToSwallow + 1
+				if uID ~= unitID then
+					local uDef = GetUnitDef(uID)
+					if uDef and not wormUnits[uDef.name] and uDef.name ~= wormUnderUnitName then
+						local ux, uy, uz = Spring.GetUnitPosition(uID)
+						local groundType, _ = Spring.GetGroundInfo(ux, uz)
+						if sandType[groundType] then
+							local dist = Spring.GetUnitSeparation(unitID, uID, true)
+							unitsToSwallow[mCeil(dist) + mRandom()] = uID -- because units might have the same distance
+							local edible = GG.wormEdibleUnit(unitID, uID)
+							if edible then
+								-- Spring.Echo(uID, UnitDefs[Spring.GetUnitDefID(uID)].name, "is edible")
+								numToSwallow = numToSwallow + 1
+								edibleUnitIDs[uID] = true
+							end
+						end
 					end
 				end
 			end
-			if numToSwallow > 0 then Swallow(unitsToSwallow) end
+			-- Spring.Echo(numToSwallow, unitsToSwallow)
+			if numToSwallow > 0 then Swallow(unitsToSwallow, edibleUnitIDs) end
 		end
 	end
 	Sleep(200)

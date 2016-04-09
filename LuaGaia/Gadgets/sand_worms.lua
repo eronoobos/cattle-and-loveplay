@@ -296,17 +296,19 @@ local function getSandUnitValues()
 		elseif uDef.name == wormTriggerUnitName then
 			inedible[uDefID] = true
 		elseif uDef.showPlayerName then --string.find(string.lower(uDef.humanName), "commander") then
-			-- spEcho(uDef.name, uDef.humanName, "is commander")
+			spEcho(uDef.name, uDef.humanName, "is commander")
 			vals[uDefID] = commanderValue
 			if not wormEatCommander then
 				inedible[uDefID] = true
 			end
 		elseif uDef.extractsMetal > 0 then
+			spEcho(uDef.name, uDef.humanName, "is mex")
 			vals[uDefID] = mexValue
 			if not wormEatMex then
 				inedible[uDefID] = true
 			end
 		elseif uDef.moveDef and uDef.moveDef.family == "hover" then
+			spEcho(uDef.name, uDef.humanName, "is hover")
 			vals[uDefID] = hoverValue
 		else
 			local cost = mFloor( uDef.metalCost + (uDef.energyCost / 50) )
@@ -417,7 +419,7 @@ end
 local function edibleUnit(emergedUnitID, uID)
 	-- spEcho(UnitDefs[spGetUnitDefID(uID)].name)
 	local wID = isEmergedWorm[emergedUnitID]
-	-- spEcho("excludeUnits?", excludeUnits[uID])
+	-- spEcho("excludeUnits?", excludeUnits[uID], wID)
 	if excludeUnits[uID] and excludeUnits[uID] ~= wID then return end
 	if wID then
 		local w = worm[wID]
@@ -431,8 +433,11 @@ local function edibleUnit(emergedUnitID, uID)
 	-- spEcho("inedibleDefIDs?", inedibleDefIDs[uDefID])
 	if inedibleDefIDs[uDefID] then return end
 	local ux, uy, uz = spGetUnitPosition(uID)
+	-- spEcho(spGetGroundInfo(ux,uz))
 	if not sandType[spGetGroundInfo(ux,uz)] then return end
+	-- spEcho(uy-spGetGroundHeight(ux,uz))
 	if uy - spGetGroundHeight(ux,uz) > biteHeight then return end
+	-- spEcho("edible.")
 	return true
 end
 
@@ -1104,7 +1109,7 @@ local function wormAttack(targetID, wID)
 		Spring.SetUnitNoDraw(w.underUnitID, true)
 		Spring.SetUnitNoMinimap(w.underUnitID, true)
 		Spring.SetUnitNoSelect(w.underUnitID, true)
-		Spring.Echo(w.underUnitID, "hidden")
+		-- Spring.Echo(w.underUnitID, "hidden")
 	end
 	isEmergedWorm[attackerID] = wID
 	w.emergedID = attackerID
@@ -1306,14 +1311,6 @@ function gadget:GameFrame(gf)
 		end
 	end	
 
-	for uID, _ in pairs(revealMeNow) do
-		Spring.Echo("reveal me now!", uID)
-		Spring.SetUnitNoDraw(uID, false)
-		Spring.SetUnitNoMinimap(uID, false)
-		Spring.SetUnitNoSelect(uID, false)
-		revealMeNow[uID] = nil
-	end
-
 	if gf % 4 == 0 then
 		-- signUnRippleExpand()
 		-- clearOldStamps()
@@ -1411,7 +1408,7 @@ function gadget:UnitDestroyed(unitID, unitDefID, teamID, attackerID, attackerDef
 					Spring.SetUnitNoDraw(w.underUnitID, false)
 					Spring.SetUnitNoMinimap(w.underUnitID, false)
 					Spring.SetUnitNoSelect(w.underUnitID, false)
-					Spring.Echo(w.underUnitID, "revealed")
+					-- Spring.Echo(w.underUnitID, "revealed")
 					spSetUnitHealth(w.underUnitID, spGetUnitHealth(unitID))
 				end
 				wormDirect(w)
