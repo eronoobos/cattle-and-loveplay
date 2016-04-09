@@ -243,8 +243,11 @@ v6 -> v7
 - / don't do wormtarget or wormdirect to worms that have an emergedID
 - / fix underworms being visible to spectators even when cloaked
 - / add fallback AI build order redirection (using similar system of nearestSand fallback)
+- make wreck sinking work (i think feature movectrl now works)
+- sink units when construction has begun
+- check if unit footprints are on sand
+- are ripple signs too expensive? yes remove them
 - make sure both fallbacks work (wormredir and ai redir)
-- are ripple signs too expensive?
 - fix unitscript errors (check if piece is valid before exploding it?)
 - remove worm radar?
 - delete unecessary files

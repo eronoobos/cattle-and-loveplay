@@ -295,6 +295,47 @@ local function occupyBuildSpot(unitID, unitDefID)
 	end
 end
 
+local function footprintOnSand(x, z, unitDefID)
+	if sandType[spGetGroundInfo(x,z)] then return true end
+	local uDef = UnitDefs[unitDefID]
+	if not uDef then return end
+	local halfFootprintX = uDef.xsize * 4
+	local halfFootprintZ = uDef.zsize * 4
+	-- Spring.Echo(uDef.xsize, uDef.zsize, halfFootprintX, halfFootprintZ)
+	local xmin = x - halfFootprintX
+	local xmax = x + halfFootprintX
+	local zmin = z - halfFootprintZ
+	local zmax = z + halfFootprintZ
+	-- Spring.MarkerAddPoint(xmin, 100, zmin, "min")
+	-- Spring.MarkerAddPoint(xmax, 100, zmax, "max")
+	for tx = xmin, xmax, 8 do
+		for tz = zmin, zmax, 8 do
+			local groundType = spGetGroundInfo(tx, tz)
+			if groundType then
+				if sandType[groundType] then return true end
+			end
+		end
+	end
+	return false
+end
+
+local function sinkThisUnit(unitID, unitDefID)
+	local x, y, z = Spring.GetUnitPosition(unitID)
+	if not x then return end
+	local groundHeight = Spring.GetGroundHeight(x, z)
+	local uDef = UnitDefs[unitDefID]
+	if not uDef then return end
+	local height = uDef.height
+	sunkHeight[unitID] = math.floor(groundHeight - height)
+	Spring.RemoveBuildingDecal(unitID)
+	Spring.MoveCtrl.Enable(unitID)
+	Spring.MoveCtrl.SetTrackGround(unitID, false)
+	Spring.MoveCtrl.SetVelocity(unitID, 0, -height/1500, 0)
+	local xRot = (math.random() - 0.5) / 1500
+	local zRot = (math.random() - 0.5) / 1500
+	Spring.MoveCtrl.SetRotationVelocity(unitID, xRot, 0.00, zRot)
+end
+
 -- synced
 if gadgetHandler:IsSyncedCode() then
 
@@ -327,11 +368,13 @@ function gadget:Initialize()
 	end
 	
 	if aiPresent then
-		Spring.Echo("AI present. Loading build redirection matrix...")
-		-- reDir = loadReDir()
-		-- reReDir = loadReReDir()
-		if not reDir or not reReDir then
-			-- Spring.Echo("using on the fly build redirection")
+		Spring.Echo("AI present. Attempting to load build redirection matrix...")
+		reDir = loadReDir()
+		reReDir = loadReReDir()
+		if reDir and reReDir then
+			Spring.Echo("Build redirection matrices loaded successfully.")
+		else
+			Spring.Echo("Could not load build redirection matrices. Using on the fly build redirection.")
 		end
 		isOccupied = {}
 		occupyThis = {}
@@ -415,32 +458,10 @@ function gadget:GameFrame(gf)
       for uID, sh in pairs(sunkHeight) do
         local x, y, z = Spring.GetUnitPosition(uID)
         if y > sh then
-  --				local h, maxH, _ = Spring.GetUnitHealth(uID)
-  --				if h > maxH / 20 then
-  --					Spring.AddUnitDamage(uID, h / 30)
-  --				end
-          local x1 = x - sinkRadius[uID]
-          local z1 = z - sinkRadius[uID]
-          local x2 = x + sinkRadius[uID]
-          local z2 = z + sinkRadius[uID]
-          for rmod=32, 0, -8 do
-            local hmod = (rmod - 16) * 0.001
-            local jitterz = math.random(0, 32) - 16
-            local jitterx = math.random(0, 32) - 16
-            local ax, az = x1-rmod+jitterx, z1-rmod+jitterz
-            if sandType[Spring.GetGroundInfo(ax,az)] then
-            	local bx, bz = x1-rmod+jitterx, z1+rmod+jitterz
-            	if sandType[Spring.GetGroundInfo(bx,bz)] then
-            		local cx, cz = x1+rmod+jitterx, z1-rmod+jitterz
-            		if sandType[Spring.GetGroundInfo(cx,cz)] then
-            			local dx, dz = x1+rmod+jitterx, z1+rmod+jitterz
-            			if sandType[Spring.GetGroundInfo(dx,dz)] then
-            				Spring.AdjustHeightMap(ax, az, dx, dz, hmod)
-            			end
-            		end
-            	end
-            end
-          end
+			local h, maxH, _ = Spring.GetUnitHealth(uID)
+			if h > maxH * 0.05 then
+				Spring.AddUnitDamage(uID, h * 0.03)
+			end
         else
           sunkHeight[uID] = nil
           sinkRadius[uID] = nil
@@ -478,22 +499,23 @@ end
 function gadget:UnitCreated(unitID, unitDefID, teamID, builderID)
 	if not restrictSand then return end
 	local x, y, z = Spring.GetUnitPosition(unitID)
-	if (x ~= nil) and (z ~= nil) then
-		local groundType, _ = Spring.GetGroundInfo(x, z)
-		if sandType[groundType] then
+	if x then
+		if footprintOnSand(x, z, unitDefID) then
+		-- local groundType, _ = Spring.GetGroundInfo(x, z)
+		-- if sandType[groundType] then
 			if (not builderID) then return true end   --no builder -> morph or something like that
 			if builderTeam == Spring.GetGaiaTeamID() then return true end
 			if isNotValid[unitDefID] then
 				if UnitDefs[unitDefID].isFeature then
 					Spring.DestroyUnit(unitID, true, true)
 				else
-					sinkUnit[unitID] = true
+					sinkThisUnit(unitID, unitDefID)
+					-- sinkUnit[unitID] = true
 				end
 				return false
 			end
 		end
 	end
-	
 	if occupyThis == { builderID, teamID, unitDefID } then
 		occupyBuildSpot(unitID, unitDefID, teamID, builderID)
 		occupyThis = {}
@@ -514,24 +536,11 @@ function gadget:FeatureCreated(featureID, allyTeam)
 	end
 end
 
-function gadget:UnitFinished(unitID, unitDefID, teamID)
-	if restrictSand and sinkUnit[unitID] then
-          local x, y, z = Spring.GetUnitPosition(unitID)
-          local groundHeight = Spring.GetGroundHeight(x, z)
-          local height = UnitDefs[unitDefID].height
-          sunkHeight[unitID] = math.floor(groundHeight - height)
-          local size = math.max(UnitDefs[unitDefID].xsize * 7, UnitDefs[unitDefID].zsize * 7) --should be 8. it is 7 so that the deformations are a bit smaller than the building
-          sinkRadius[unitID] = size / 2
-          Spring.RemoveBuildingDecal(unitID)
-          Spring.MoveCtrl.Enable(unitID)
-          Spring.MoveCtrl.SetTrackGround(unitID, false)
-          Spring.MoveCtrl.SetVelocity(unitID, 0, -height/1500, 0)
-          local xRot = (math.random() - 0.5) / 1500
-          local zRot = (math.random() - 0.5) / 1500
-          Spring.MoveCtrl.SetRotationVelocity(unitID, xRot, 0.00, zRot)
-          sinkUnit[unitID] = nil
-	end
-end
+-- function gadget:UnitFinished(unitID, unitDefID, teamID)
+-- 	if restrictSand and sinkUnit[unitID] then
+--           sinkThisUnit(unitID, unitDefID)
+-- 	end
+-- end
 
 end
 -- end synced
