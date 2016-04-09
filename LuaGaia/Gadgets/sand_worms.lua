@@ -1101,8 +1101,10 @@ local function wormAttack(targetID, wID)
 	local attackerID = spCreateUnit(w.size.unitName, x, y, z, 0, gaiaTeam, false)
 	if w.underUnitID then
 		-- hide underworm
-		Spring.MoveCtrl.SetTrackGround(unitID, false)
-		spMoveCtrlSetPosition(w.underUnitID, w.x, -5000, w.z)
+		Spring.SetUnitNoDraw(w.underUnitID, true)
+		Spring.SetUnitNoMinimap(w.underUnitID, true)
+		Spring.SetUnitNoSelect(w.underUnitID, true)
+		Spring.Echo(w.underUnitID, "hidden")
 	end
 	isEmergedWorm[attackerID] = wID
 	w.emergedID = attackerID
@@ -1304,6 +1306,14 @@ function gadget:GameFrame(gf)
 		end
 	end	
 
+	for uID, _ in pairs(revealMeNow) do
+		Spring.Echo("reveal me now!", uID)
+		Spring.SetUnitNoDraw(uID, false)
+		Spring.SetUnitNoMinimap(uID, false)
+		Spring.SetUnitNoSelect(uID, false)
+		revealMeNow[uID] = nil
+	end
+
 	if gf % 4 == 0 then
 		-- signUnRippleExpand()
 		-- clearOldStamps()
@@ -1397,9 +1407,12 @@ function gadget:UnitDestroyed(unitID, unitDefID, teamID, attackerID, attackerDef
 				-- worm appatite whetted
 				w.tx, w.tz = nil, nil
 				w.endSecond = spGetGameSeconds() + baseWormDuration
-				if w.underUnit then
+				if w.underUnitID then
+					Spring.SetUnitNoDraw(w.underUnitID, false)
+					Spring.SetUnitNoMinimap(w.underUnitID, false)
+					Spring.SetUnitNoSelect(w.underUnitID, false)
+					Spring.Echo(w.underUnitID, "revealed")
 					spSetUnitHealth(w.underUnitID, spGetUnitHealth(unitID))
-					spMoveCtrlSetPosition(w.underUnitID, w.x, spGetGroundHeight(w.x, w.z), w.z)
 				end
 				wormDirect(w)
 			end

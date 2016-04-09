@@ -57,9 +57,9 @@ local function footprintOnSand(x, z, unitDefID, facing)
 	end
 	-- Spring.Echo(uDef.xsize, uDef.zsize, halfFootprintX, halfFootprintZ)
 	local xmin = x - halfFootprintX
-	local xmax = x + halfFootprintX - 8
+	local xmax = x + halfFootprintX
 	local zmin = z - halfFootprintZ
-	local zmax = z + halfFootprintZ - 8
+	local zmax = z + halfFootprintZ
 	-- Spring.MarkerAddPoint(xmin, 100, zmin, "min")
 	-- Spring.MarkerAddPoint(xmax, 100, zmax, "max")
 	local badFeet = {}
@@ -68,7 +68,10 @@ local function footprintOnSand(x, z, unitDefID, facing)
 			local groundType = Spring.GetGroundInfo(tx, tz)
 			if groundType then
 				if sandType[groundType] then
-					table.insert(badFeet, {x = tx, z = tz} )
+					local fx, fz = tx, tz
+					if tx == xmax then fx = tx - 16 end
+					if tz == zmax then fz = tz - 16 end
+					table.insert(badFeet, {x = fx, z = fz} )
 				end
 			end
 		end

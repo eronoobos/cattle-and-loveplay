@@ -295,12 +295,17 @@ local function occupyBuildSpot(unitID, unitDefID)
 	end
 end
 
-local function footprintOnSand(x, z, unitDefID)
-	if sandType[spGetGroundInfo(x,z)] then return true end
+local function footprintOnSand(x, z, unitDefID, facing)
+	-- if sandType[Spring.GetGroundInfo(x,z)] then return true end
 	local uDef = UnitDefs[unitDefID]
 	if not uDef then return end
 	local halfFootprintX = uDef.xsize * 4
 	local halfFootprintZ = uDef.zsize * 4
+	if facing % 2 ~= 0 then
+		local hfpz = halfFootprintZ+0
+		halfFootprintZ = halfFootprintX
+		halfFootprintX = hfpz
+	end
 	-- Spring.Echo(uDef.xsize, uDef.zsize, halfFootprintX, halfFootprintZ)
 	local xmin = x - halfFootprintX
 	local xmax = x + halfFootprintX
@@ -308,14 +313,19 @@ local function footprintOnSand(x, z, unitDefID)
 	local zmax = z + halfFootprintZ
 	-- Spring.MarkerAddPoint(xmin, 100, zmin, "min")
 	-- Spring.MarkerAddPoint(xmax, 100, zmax, "max")
-	for tx = xmin, xmax, 8 do
-		for tz = zmin, zmax, 8 do
-			local groundType = spGetGroundInfo(tx, tz)
+	-- local badFeet = {}
+	for tx = xmin, xmax, 16 do
+		for tz = zmin, zmax, 16 do
+			local groundType = Spring.GetGroundInfo(tx, tz)
 			if groundType then
-				if sandType[groundType] then return true end
+				if sandType[groundType] then
+					return true
+					-- table.insert(badFeet, {x = tx, z = tz} )
+				end
 			end
 		end
 	end
+	-- if #badFeet > 0 then return badFeet end
 	return false
 end
 
@@ -500,7 +510,7 @@ function gadget:UnitCreated(unitID, unitDefID, teamID, builderID)
 	if not restrictSand then return end
 	local x, y, z = Spring.GetUnitPosition(unitID)
 	if x then
-		if footprintOnSand(x, z, unitDefID) then
+		if footprintOnSand(x, z, unitDefID, Spring.GetUnitBuildFacing(unitID)) then
 		-- local groundType, _ = Spring.GetGroundInfo(x, z)
 		-- if sandType[groundType] then
 			if (not builderID) then return true end   --no builder -> morph or something like that

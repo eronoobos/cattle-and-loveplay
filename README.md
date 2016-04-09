@@ -241,15 +241,17 @@ v6 -> v7
 - / make gui_start_alerts use sandType table
 - / make gui_start_alerts find groundTypes more efficiently, a la the nearestSand fallback in sand_worms
 - / don't do wormtarget or wormdirect to worms that have an emergedID
-- / fix underworms being visible to spectators even when cloaked
 - / add fallback AI build order redirection (using similar system of nearestSand fallback)
-- make wreck sinking work (i think feature movectrl now works)
-- sink units when construction has begun
-- check if unit footprints are on sand
+- / sink units when construction has begun
+- / check if unit footprints are on sand
+- / make sure both fallbacks work (wormredir and ai redir)
+- / fix hide/reveal underworm
+- fix worm not being able to eat certain units? armpw, armak? WTF
+- make default to not sink wrecks
 - are ripple signs too expensive? yes remove them
-- make sure both fallbacks work (wormredir and ai redir)
 - fix unitscript errors (check if piece is valid before exploding it?)
 - remove worm radar?
+- smooth transition from underworm to emerged if possible
 - delete unecessary files
 - make lightning more efficient & less dumb looking by either using projectiles (beamlaser), or with opengl lines?
 - BAD IDEA?: rather than movectrl, wait until the worms lips are most of the way out of the sand, and then evaluate what is inside and eat it. use a four-lipped worm to form a cage from with units can't escape. the model must have lips halfway open, so that when the mouth is fully open, the colvols are at 45 degrees or so
