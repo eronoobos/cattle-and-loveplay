@@ -21,7 +21,7 @@ local buildSpacing = 16
 -- these default values are changed in gadget:Initialize()
 local aiPresent = false
 local restrictSand = true
-local sinkWrecks = true
+local sinkWrecks = false
 
 -- for AI command redirection
 local reDir
@@ -357,8 +357,8 @@ function gadget:Initialize()
 			restrictSand = false
 		end
 		
-		if mapOptions.sink_wrecks == "0" then
-			sinkWrecks = false
+		if mapOptions.sink_wrecks == "1" then
+			sinkWrecks = true
 		end
 	end
 	if not restrictSand and not sinkWrecks then

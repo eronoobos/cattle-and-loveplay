@@ -22,7 +22,7 @@ local options = {
 		desc	= 'Wrecks slowly sink into the sand (not really--they lose health).',
 		type	= 'bool',
 		section = '1_terrain_sect',
-		def	= 'true',
+		def	= 'false',
 	},
 
 	{

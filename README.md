@@ -247,7 +247,7 @@ v6 -> v7
 - / make sure both fallbacks work (wormredir and ai redir)
 - / fix hide/reveal underworm
 - / fix worm not being able to eat certain units: armpw, armak. Was problem with the keys of the unitsToSwallow table being distance (therefore the only unit that showed up was underworm)
-- make default to not sink wrecks
+- / make default to not sink wrecks
 - are ripple signs too expensive? yes remove them
 - fix unitscript errors (check if piece is valid before exploding it?)
 - remove worm radar?

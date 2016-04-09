@@ -13,7 +13,7 @@ end
 local gameStarted = false
 
 local restrictSand = true
-local sinkWrecks = true
+local sinkWrecks = false
 local areWorms = true
 
 local sandType = { ["Sand"] = true }
@@ -117,8 +117,8 @@ function widget:Initialize()
 		if mapOptions.restrict_sand_building == "0" then
 			restrictSand = false
 		end
-		if mapOptions.sink_wrecks == "0" then
-			sinkWrecks = false
+		if mapOptions.sink_wrecks == "1" then
+			sinkWrecks = true
 		end
 		if mapOptions.sand_worms == "0" then
 			areWorms = false
