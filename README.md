@@ -251,8 +251,9 @@ v6 -> v7
 - / make start alerts persist a small while after the game starts, if the start type is something other than choose in-game
 - / change style of start position warning
 - / use displaylists in start alerts
-- remove ripple signs
+- / remove ripple signs
 - remove worm radar
+- distinguish between little and medium lightning with sounds
 - add nighttime dust and dirt ceg bitmaps
 - delete unecessary files
 - fix unitscript errors (check if piece is valid before exploding it?)

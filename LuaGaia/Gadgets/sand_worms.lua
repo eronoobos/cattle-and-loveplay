@@ -43,10 +43,6 @@ local mexValue = -200 -- negative value = inaccuracy of targetting
 local hoverValue = -300 -- negative value = inaccuracy of targetting
 local commanderValue = -100 -- negative value = inaccuracy of targetting
 local wormSignFrequency = 20 -- average time in seconds between worm signs (varies + or - 50%)
-local rippleNumMin = 5
-local rippleNumMax = 10
-local bulgeSize = 7
-local bulgeScale = 8
 local attackDelay = 22 -- delay between worm attacks
 local cellSize = 64 -- for wormReDir
 local evalFrequency = 150 -- game frames between evaluation of units on sand
@@ -58,8 +54,6 @@ local killMeNow = {} -- units to be killed on a particular frame (to avoid recur
 local inedibleDefIDs = {} -- units worms should not eat
 local astar = {} -- for later inclusion of the astar module
 local excludeUnits = {}
-local newRipples = {}
-local oldStamps = {}
 local wormSizes = {}
 local largestSandUnitSize = 0
 local wormChance = 0.1 -- chance out of 1 that a worm appears. changes with worm anger.
@@ -85,8 +79,6 @@ local isEmergedWorm = {} -- is unitID an emerged attacking worm?
 local halfCellSize = cellSize / 2
 local sizeX = Game.mapSizeX 
 local sizeZ = Game.mapSizeZ
-local rippled = {} -- stores references to rippleMap nodes that are actively under transformation
-local rippleMap = {}-- stores locations of sand that has been raised by worm to lower it
 
 --sounds, see gamedata/sounds.lua
 local quakeSnds = { "WmQuake1", "WmQuake2", "WmQuake3", "WmQuake4" }
@@ -321,37 +313,6 @@ local function getSandUnitValues()
 	return vals, inedible
 end
 
-local function createFullBulgeStamp(size)
-	local stamp = {}
-	for xi=-size,size do
-		local x = xi * 8
-		local dx = mAbs(xi) / size
-		for zi=-size,size do
-			local z = zi * 8
-			local dz = mAbs(zi) / size
-			local d = mSqrt((dx^2) + (dz^2))
-			local h
-			if d > 1 then
-				h = 0
-			else
-				h = 1-(d^3)
-			end
-			tInsert(stamp, { x = x, z = z, h = h })
-		end
-	end
-	return stamp
-end
-
-local function createRippleExpansionMap()
-	local emap = {}
-	emap = {
-		{x = -8, z = -8, h = 0.71}, {x = 0, z = -8, h = 1}, {x = 8, z = -8, h = 0.71},
-		{x = -8, z = 0, h = 1},								{x = 8, z = 0, h = 1},
-		{x = -8, z = 8, h = 0.71}, {x = 0, z = 8, h = 1}, {x = 8, z = 8, h = 0.71}
-	}
-	return emap
-end
-
 local function mapClampX(x)
 	return mMax(mMin(x, sizeX), 0)
 end
@@ -457,7 +418,6 @@ local function getWormSizes(sizesByUnitName)
 	local sizes = {}
 	for unitName, s in pairs(sizesByUnitName) do
 		local uDef = UnitDefNames[unitName]
-		local bulgeStamp = createFullBulgeStamp(mCeil(uDef.radius / 8))
 		local nodeSize = math.ceil(uDef.radius * 2.1)
 		local wormGraph = getWormPathGraph(nodeSize)
 		local nodeDist = 1+ (2 * (nodeSize^2))
@@ -467,7 +427,7 @@ local function getWormSizes(sizesByUnitName)
 			end
 			return false
 		end
-		local size = { radius = uDef.radius, diameter = uDef.radius * 2, maxMealSize = mCeil(uDef.radius * 0.888), bulgeStamp = bulgeStamp, rippleHeight = uDef.radius / 20, bulgeHeight = uDef.radius / 120, unitName = unitName, badTargets = {}, wormGraph = wormGraph, valid_node_func = valid_node_func, nodeSize = nodeSize }
+		local size = { radius = uDef.radius, diameter = uDef.radius * 2, maxMealSize = mCeil(uDef.radius * 0.888), unitName = unitName, badTargets = {}, wormGraph = wormGraph, valid_node_func = valid_node_func, nodeSize = nodeSize }
 		sizes[s] = size
 	end
 	return sizes
@@ -632,26 +592,6 @@ local function wormTargetting()
 	return num, mCeil(totalMovement)
 end
 
-local function signLightning(x, z)
-	local y = spGetGroundHeight(x, z)
-	local lx = 0
-	local lz = 0
-	local weaponDefID = WeaponDefNames["wormlightning"].id
-	for ly=0,2000,48 do
-		local xrand = (2*mRandom()) - 1
-		local zrand = (2*mRandom()) - 1
-		local dx = xrand * 48
-		local dz = zrand * 48
-		local projectileID = spSpawnProjectile(weaponDefID, {["pos"] = {x+lx, y+ly, z+lz}, ["end"] = {x+lx+dx, y+ly+48, z+lz+dz}, ttl = 15, team = gaiaTeam, maxRange = 49, startAlpha = 1, endAlpha = 1, })
-		-- spSetProjectilePosition(projectileID, x+lx, y+ly, z+lz)
-		spSetProjectileTarget(projectileID, x+lx+dx, y+ly+48, z+lz+dz)
-		lx = lx + dx
-		lz = lz + dz
-	end
-	spSpawnCEG("WORMSIGN_FLASH",x,y,z,0,1,0,2,0)
-end
-
-
 local function signArcLightning(x, z, arcLength, heightDivisor, segLength, lightningCeg, flashCeg)
 	arcLength = arcLength or 48
 	heightDivisor = heightDivisor or 1
@@ -688,7 +628,6 @@ end
 local function wormBigSign(w)
 	local sx = w.x
 	local sz = w.z
-	-- signLightning(sx, sz)
 	local minArc = mCeil(w.size.radius * 8)
 	local maxArc = mCeil(w.size.radius * 10)
 	signArcLightning( sx, sz, mRandom(minArc,maxArc), 1+mRandom(), 32, "WORMSIGN_LIGHTNING", "WORMSIGN_FLASH" )
@@ -727,163 +666,6 @@ local function wormLittleSign(w, sx, sz)
 	end
 	local snd = lightningSnds[mRandom(#lightningSnds)]
 	spPlaySoundFile(snd,0.1,sx,sy,sz)
-end
-
-local function initializeRippleMap()
-	for rx = 0, sizeX/8 do
-		rippleMap[rx] = {}
-		for rz = 0, sizeZ/8 do
-			rippleMap[rx][rz] = 0
-		end
-	end
-end
-
-local function addRipple(x, z, hmod)
-	if hmod > 0.1 then
-		local rx = mFloor(x / 8)
-		local rz = mFloor(z / 8)
-		if not rippleMap[rx] then
-			-- spEcho("bad rx in ripplemap", rx)
-			return
-		end
-		if not rippleMap[rx][rz] then
-			-- spEcho("bad rz in ripplemap", rz)
-			return
-		end
-		-- if rippleMap[rx][rz] == 0 then
-			tInsert(newRipples, {rx, rz, hmod})
-		-- end
-		-- rippleMap[rx][rz] = rippleMap[rx][rz] + hmod
-		-- x = rx * 8
-		-- z = rz * 8
-		-- spAdjustHeightMap(x, z, x+8, z+8, hmod)
-	end
-end
-
-local function signStampRipple(w, mult, lightning)
-	local x, z = w.x, w.z
-	local bulgeStamp = w.size.bulgeStamp
-	local rippleHeight = w.size.rippleHeight
-	local hmodBase = rippleHeight*mult
-	if hmodBase > 0.1 then
-		x = x - (x % 8)
-		z = z - (z % 8)
-		local lmult
-		if lightning then lmult = mult / 65 end
-		local num = mRandom(rippleNumMin,rippleNumMax)
-		-- local num = 8
-		for n=1,num do
-			stamp = bulgeStamp[mRandom(1,#bulgeStamp)]
-			local bx, bz, bh = stamp.x, stamp.z, stamp.h
-			if bh > 0 then
-				local sx = x + bx
-				local sz = z + bz
-				local gt, _ = spGetGroundInfo(sx, sz)
-				if sandType[gt] then
-					local hmod = bh * hmodBase
-					addRipple(sx, sz, hmod)
-					if lightning then
-						if mRandom() < (0.001 + lmult) then
-							wormLittleSign(w, sx, sz)
-						end
-					end
-				end
-			end
-		end
-	end
-end
-
-local function writeNewRipples()
-	if #newRipples == 0 then return end
-	spSetHeightMapFunc(function()
-		for id, vals in pairs(newRipples) do
-			local rx = vals[1]
-			local rz = vals[2]
-			local x = rx * 8
-			local z = rz * 8
-			local hmod = vals[3]
-			spAddHeightMap(x, z, hmod)
-			if rippleMap[rx][rz] == 0 then
-				tInsert(rippled, {rx, rz})
-			end
-			rippleMap[rx][rz] = rippleMap[rx][rz] + hmod
-		end
-	end)
-	newRipples = {}
-end
-
-local function signUnRippleExpand()
---	local numripples = #rippled
---	if numripples > 0 then spEcho(#rippled) end
-	spSetHeightMapFunc(function()
-		for id = #rippled, 1, -1 do
-			local vals = rippled[id]
-			local rx = vals[1]
-			local rz = vals[2]
-			local x = rx * 8
-			local z = rz * 8
-			local hmod = rippleMap[rx][rz]
-			if hmod >= 0.2 then
-				local hsub = hmod / 2
-				spAddHeightMap(x, z, -hsub)
-				rippleMap[rx][rz] = hsub
-				local i = mRandom(1,8)
-				local ex = x + rippleExpand[i].x
-				local ez = z + rippleExpand[i].z
-				local eh = hsub * rippleExpand[i].h
-				addRipple(ex, ez, eh)
-			else
-				spAddHeightMap(x, z, -hmod)
-				rippleMap[rx][rz] = 0
-				tRemove(rippled, id)
-			end
-		end
-	end)
-end
-
-local function signStamp(w)
-	local x, z, bh = w.x, w.z, w.size.bulgeHeight*0.1 + w.size.bulgeHeight*mRandom()
-	x, z = CirclePos(x, z, w.size.radius*0.1)
-	spSetHeightMapFunc(function()
-		for _, stamp in pairs(w.size.bulgeStamp) do
-			local sx, sz = x+stamp.x, z+stamp.z
-			local gt, _ = spGetGroundInfo(sx, sz)
-			if sandType[gt] then
-				spAddHeightMap(x+stamp.x, z+stamp.z, stamp.h*bh)
-			end
-		end
-	end)
-	local gf = spGetGameFrame()
-	tInsert(oldStamps, {x = x, z = z, bulgeHeight = bh, stamp = w.size.bulgeStamp, endFrame = gf + 12, halfFrame = gf + 6 })
-end
-
-local function clearOldStamps()
-	local gf = spGetGameFrame()
-	spSetHeightMapFunc(function()
-		for i = #oldStamps, 1, -1 do
-			local old = oldStamps[i]
-			local x, z, bh = old.x, old.z, old.bulgeHeight
-			if gf >= old.endFrame then
-				for _, stamp in pairs(old.stamp) do
-					local sx, sz = x+stamp.x, z+stamp.z
-					local gt, _ = spGetGroundInfo(sx, sz)
-					if sandType[gt] then
-						spAddHeightMap(x+stamp.x, z+stamp.z, -(stamp.h*bh)/2)
-					end
-				end
-				tRemove(oldStamps, i)
-			elseif not old.halved and gf >= old.halfFrame then
-				for _, stamp in pairs(old.stamp) do
-					local sx, sz = x+stamp.x, z+stamp.z
-					local gt, _ = spGetGroundInfo(sx, sz)
-					if sandType[gt] then
-						spAddHeightMap(x+stamp.x, z+stamp.z, -(stamp.h*bh)/2)
-					end
-				end
-				old.halved = true
-			end
-		end
-	end)
 end
 
 local function normalizeVector(vx, vz)
@@ -1117,41 +899,26 @@ local function wormAttack(targetID, wID)
 	w.vx, w.vz = 0, 0
 end
 
-local function doWormMovementAndRipple(gf, second)
+local function doWormMovementAndEffects(gf, second)
 	for wID, w in pairs(worm) do
 		if w.vx and not w.emergedID then
 			w.x = mapClampX(w.x + (w.vx*w.speed))
 			w.z = mapClampZ(w.z + (w.vz*w.speed))
-			-- Spring.Echo(w.x, w.z)
 			-- SendToUnsynced("passWorm", wID, w.x, w.z, w.vx, w.vz, w.vx, w.vz, w.tx, w.tz, w.signSecond, w.endSecond ) --uncomment this to show the worms positions, vectors, and targets real time (uses gui_worm_debug.lua)
 		end
-		-- if not w.emergedID then
-			-- signStamp(w)
-		-- end
-		local rippleMult = nil
-		if second > w.signSecond-4 and second < w.signSecond+3 then -- and not w.emergedID then
-			-- if it's one second before or after worm sign second, ripple sand
-			lightning = mRandom() < 0.4
-			rippleMult = 1 / (1 + mAbs(second - w.signSecond))
-		elseif w.vx and not w.emergedID then
-			-- when moving, always ripple sand a little with occasional ground lightning
-			lightning = mRandom() < 0.3
-			rippleMult = 0.2
-		end
-		if rippleMult then
-			-- signStampRipple(w, rippleMult, lightning)
-			if mRandom() < rippleMult * 0.3 then
-				local cegx = mapClampX(w.x + mRandom(w.size.diameter) - w.size.radius)
-				local cegz = mapClampZ(w.z + mRandom(w.size.diameter) - w.size.radius)
-				local groundType, _ = spGetGroundInfo(cegx, cegz)
-				if sandType[groundType] then
-					local cegy = spGetGroundHeight(cegx, cegz)
-					spSpawnCEG("sworm_dust",cegx,cegy,cegz,0,1,0,30,0)
-				end
-				if lightning and mRandom() < 0.5 then wormLittleSign(w, cegx, cegz) end
+		local lightning = mRandom() < 0.01
+		local dust = mRandom() < 0.25
+		if dust then
+			local cegx = mapClampX(w.x + mRandom(w.size.diameter) - w.size.radius)
+			local cegz = mapClampZ(w.z + mRandom(w.size.diameter) - w.size.radius)
+			local groundType, _ = spGetGroundInfo(cegx, cegz)
+			if sandType[groundType] then
+				local cegy = spGetGroundHeight(cegx, cegz)
+				spSpawnCEG("sworm_dust",cegx,cegy,cegz,0,1,0,30,0)
 			end
 		end
-		if w.emergedID and mRandom() < 0.01 then
+		if lightning then wormLittleSign(w, cegx, cegz) end
+		if w.emergedID and mRandom() < 0.015 then
 			wormMediumSign(w)
 		end
 	end
@@ -1278,8 +1045,6 @@ function gadget:Initialize()
 	wormReDir = loadWormReDir()
 	astar = VFS.Include('a-star-lua/a-star.lua')
 	wormSizes = getWormSizes(wormEmergeUnitNames)
-	rippleExpand = createRippleExpansionMap()
-	initializeRippleMap()
 	nextPotentialEvent = spGetGameSeconds() + wormEventFrequency
 	-- clear leftover worm units
 	local units = spGetTeamUnits(gaiaTeam)
@@ -1311,13 +1076,7 @@ function gadget:GameFrame(gf)
 		end
 	end	
 
-	if gf % 4 == 0 then
-		-- signUnRippleExpand()
-		-- clearOldStamps()
-	end
-
-	doWormMovementAndRipple(gf, second) -- worm movement and ground ripple
-	-- writeNewRipples()
+	doWormMovementAndEffects(gf, second) -- worm movement dust and small lightning
 
 	evalCycle(gf, second) -- unit evaluation cycle
 
