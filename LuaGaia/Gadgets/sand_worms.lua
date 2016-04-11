@@ -42,11 +42,9 @@ local distancePerValue = 2000 -- how value converts to distance, to decide betwe
 local mexValue = -200 -- negative value = inaccuracy of targetting
 local hoverValue = -300 -- negative value = inaccuracy of targetting
 local commanderValue = -100 -- negative value = inaccuracy of targetting
-local wormSignFrequency = 20 -- average time in seconds between worm signs (varies + or - 50%)
 local attackDelay = 22 -- delay between worm attacks
 local cellSize = 64 -- for wormReDir
 local evalFrequency = 150 -- game frames between evaluation of units on sand
-local signEvalFrequency = 12 -- game frames between parts of a wormsign volley (lower value means more lightning strikes per sign)
 local attackEvalFrequency = 30 -- game frames between attacking units in range of worm under sand
 
 -- storage variables
@@ -71,8 +69,6 @@ local numSandUnits = 0
 local totalSandMovement = 0
 local sandUnitValues = {} -- sandUnitValues[unitDefID] = value (the amount it attracts the worm
 local worm = {}
-local signFreqMin = wormSignFrequency / 2 -- the minimum pause between worm signs
-local signFreqMax = wormSignFrequency + signFreqMin -- maximum pause between worm signs
 local gaiaTeam -- which team is gaia? (set in Initialize())
 local wormReDir -- precalculated 2d matrix of where to shunt the worm if it tries to move onto rock
 local isEmergedWorm = {} -- is unitID an emerged attacking worm?
@@ -748,19 +744,6 @@ local function wormDirect(w)
 	w.vx, w.vz = normalizeVector(distx, distz)
 end
 
-local function passWormSign(x, z)
-	local allyList = spGetAllyTeamList()
-	local y = spGetGroundHeight(x, z)
-	for k, aID in pairs(allyList) do
-		local inRadar = spIsPosInRadar(x, y, z, aID)
-		local inLos = spIsPosInAirLos(x, y, z, aID)
-		if inRadar or inLos then
-			SendToUnsynced("passSign", aID, x, y, z, inLos)
-		end
-	end
-	SendToUnsynced("passSpectatorSign", x, y, z)
-end
-
 local function wormSpawn(x, z)
 	local w = { 1 }
 	local id = 0
@@ -814,7 +797,6 @@ local function wormSpawn(x, z)
 		local w = { 
 			x = spawnX, z = spawnZ,
 			endSecond = second + baseWormDuration,
-			signSecond = second + mRandom(signFreqMin, signFreqMax),
 			nextAttackEval = frame + attackEvalFrequency,
 			bellyCount = 0,
 			speed = speed,
@@ -836,7 +818,6 @@ local function wormSpawn(x, z)
 		worm[wID] = w
 		wormBigSign(w)
 		-- spEcho(speed, range)
-		-- passWormSign(spawnX, spawnZ)
 	end
 end
 
@@ -906,8 +887,14 @@ local function doWormMovementAndEffects(gf, second)
 			w.z = mapClampZ(w.z + (w.vz*w.speed))
 			-- SendToUnsynced("passWorm", wID, w.x, w.z, w.vx, w.vz, w.vx, w.vz, w.tx, w.tz, w.signSecond, w.endSecond ) --uncomment this to show the worms positions, vectors, and targets real time (uses gui_worm_debug.lua)
 		end
+		local quake = mRandom() < 0.0015
 		local lightning = mRandom() < 0.01
 		local dust = mRandom() < 0.25
+		if quake then
+			local y = spGetGroundHeight(w.x, w.z)
+			local snd = quakeSnds[mRandom(#quakeSnds)]
+			spPlaySoundFile(snd,1.5,w.x,y,w.z)
+		end
 		if dust then
 			local cegx = mapClampX(w.x + mRandom(w.size.diameter) - w.size.radius)
 			local cegz = mapClampZ(w.z + mRandom(w.size.diameter) - w.size.radius)
@@ -917,7 +904,13 @@ local function doWormMovementAndEffects(gf, second)
 				spSpawnCEG("sworm_dust",cegx,cegy,cegz,0,1,0,30,0)
 			end
 		end
-		if lightning then wormLittleSign(w, cegx, cegz) end
+		if lightning then
+			if mRandom() < 0.15 then
+				wormBigSign(w)
+			else
+				wormLittleSign(w, cegx, cegz)
+			end
+		end
 		if w.emergedID and mRandom() < 0.015 then
 			wormMediumSign(w)
 		end
@@ -1003,7 +996,6 @@ local function doWormAttacks(gf, second)
 				end
 			end
 			if bestID then
-				w.signSecond = second + 1 -- for ground ripples
 				wormAttack(bestID, wID)
 				-- if (Script.UnitScript('getWorm')) then
 			 --        Script.LuaUI.myevent(666)
@@ -1089,31 +1081,6 @@ function gadget:GameFrame(gf)
 	end
 
 	doWormAttacks(gf, second) -- do worm attacks
-	
-	-- do worm sign lightning and pass wormsign markers to widget
-	if gf % signEvalFrequency == 0 then
-		for wID, w in pairs(worm) do
-			if not w.emergedID then
-				-- wormBigSign(w)
-				if not w.hasSigned and second >= w.signSecond then
-					wormBigSign(w)
-					-- passWormSign(w.x, w.z)
-					w.hasSigned = true
-				end
-				if not w.hasQuaked and second > w.signSecond - 4 then
-					local y = spGetGroundHeight(w.x, w.z)
-					local snd = quakeSnds[mRandom(#quakeSnds)]
-					spPlaySoundFile(snd,1.5,w.x,y,w.z)
-					w.hasQuaked = true
-				end
-				if second > w.signSecond + 3 then
-					w.signSecond = second + mRandom(signFreqMin, signFreqMax)
-					w.hasQuaked = false
-					w.hasSigned = false
-				end
-			end
-		end
-	end
 end
 
 function gadget:UnitCreated(unitID, unitDefID, unitTeam, builderID)
@@ -1210,26 +1177,11 @@ if not gadgetHandler:IsSyncedCode() then
 		Script.LuaUI.passSandUnit(uID, uval)
 	  end
 	end
-	
-	local function signToLuaUI(_, allyID, x, y, z, los)
-		local myAlly = spGetLocalAllyTeamID()
-		if myAlly == allyID and (Script.LuaUI('passSign')) then
-			Script.LuaUI.passSign(x, y, z, los)
-		end
-	end
-	
-	local function specSignToLuaUI(_, x, y, z)
-		if spGetSpectatingState() then
-			Script.LuaUI.passSign(x, y, z, true)
-		end
-	end
 
 	function gadget:Initialize()
 	  gadgetHandler:AddSyncAction('passWormInit', initToLuaUI)
 	  gadgetHandler:AddSyncAction('passWorm', wormToLuaUI)
 	  gadgetHandler:AddSyncAction('passSandUnit', sandUnitToLuaUI)
-	  gadgetHandler:AddSyncAction('passSign', signToLuaUI)
-	  gadgetHandler:AddSyncAction('passSpectatorSign', specSignToLuaUI)
 	end
 	
 end
