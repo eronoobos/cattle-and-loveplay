@@ -248,10 +248,14 @@ v6 -> v7
 - / fix hide/reveal underworm
 - / fix worm not being able to eat certain units: armpw, armak. Was problem with the keys of the unitsToSwallow table being distance (therefore the only unit that showed up was underworm)
 - / make default to not sink wrecks
-- are ripple signs too expensive? yes remove them
-- fix unitscript errors (check if piece is valid before exploding it?)
-- remove worm radar?
-- smooth transition from underworm to emerged if possible
+- / make start alerts persist a small while after the game starts, if the start type is something other than choose in-game
+- / change style of start position warning
+- / use displaylists in start alerts
+- remove ripple signs
+- remove worm radar
+- add nighttime dust and dirt ceg bitmaps
 - delete unecessary files
+- fix unitscript errors (check if piece is valid before exploding it?)
+- smooth transition from underworm to emerged if possible
 - make lightning more efficient & less dumb looking by either using projectiles (beamlaser), or with opengl lines?
 - BAD IDEA?: rather than movectrl, wait until the worms lips are most of the way out of the sand, and then evaluate what is inside and eat it. use a four-lipped worm to form a cage from with units can't escape. the model must have lips halfway open, so that when the mouth is fully open, the colvols are at 45 degrees or so

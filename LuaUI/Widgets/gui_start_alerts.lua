@@ -16,6 +16,7 @@ local restrictSand = true
 local sinkWrecks = false
 local areWorms = true
 
+local startDelay = 1 -- how many frames to keep alert
 local sandType = { ["Sand"] = true }
 local sandGraph
 local sandNodeSize = 256
@@ -30,12 +31,12 @@ local myHeaderFont
 local myFont
 local sizeX = Game.mapSizeX 
 local sizeZ = Game.mapSizeZ
+local sandyStarts = {}
+local startsChanged = 1
+
+local screenDisplayList = 0
 
 local alertHeight = 250
-
-local goodCamState = {}
-local sandX
-local sandY
 
 local spGetGroundInfo = Spring.GetGroundInfo
 local tInsert = table.insert
@@ -87,7 +88,16 @@ local function nearestNodeScreenCoords(sx, sy, nodes, nodeDist)
 	end
 end
 
-function drawLandMarker(r, g, b, a, x1, y1, x2, y2, x3)
+local function cameraStatesMatch(stateA, stateB)
+	if not stateA or not stateB then return end
+	if #stateA ~= #stateB then return end
+	for key, value in pairs(stateA) do
+		if value ~= stateB[key] then return end
+	end
+	return true
+end
+
+local function drawLandMarker(r, g, b, a, x1, y1, x2, y2, x3)
 	for n=5, 4, -1 do
 		if n == 5 then
 			gl.LineWidth(4)
@@ -106,6 +116,35 @@ function drawLandMarker(r, g, b, a, x1, y1, x2, y2, x3)
 		end
 		gl.Rect(x2-n, y2-n, x2+n, y2+n)
 	end
+end
+
+local function drawAlerts(viewX, viewY, sx, sy, alertX, alertSlide, alertOpacity, sandyStarts)
+	gl.Color(1, 0.9, 0.5, 1)
+	myFont:Print(sandTitle, alertX, viewY*0.3, 36, "rvno")
+	myFont:Print(sandTitle, alertX, viewY*0.3, 36, "rvn")
+	myFont:Print(sandWarning, alertX, viewY*0.26, 16, "rvo")
+	myFont:Print(sandWarning, alertX, viewY*0.26, 16, "rv")
+	if sx then
+		if sx > viewX*0.65 then
+			drawLandMarker(1.0, 0.9, 0.5, alertOpacity, viewX*0.61*alertSlide, viewY*0.3, sx, sy)
+		else
+			drawLandMarker(1.0, 0.9, 0.5, alertOpacity, viewX*0.61*alertSlide, viewY*0.3, sx, sy, viewX*0.63)
+		end
+	end
+	gl.Color(1, 0, 0, 1)
+	gl.LineWidth(4)
+	for _, start in pairs(sandyStarts) do
+		local scrX, scrY = Spring.WorldToScreenCoords(start.x,start.y,start.z)
+		-- gl.BeginEnd(GL.LINE_STRIP, DoLine, start.x-48, start.y-48, 0, start.x+48, start.y-48, 0)
+		-- gl.BeginEnd(GL.LINE_STRIP, DoLine, start.x+48, start.y-48, 0, start.x+48, start.y+48, 0)
+		-- gl.BeginEnd(GL.LINE_STRIP, DoLine, start.x+48, start.y+48, 0, start.x-48, start.y+48, 0)
+		-- gl.BeginEnd(GL.LINE_STRIP, DoLine, start.x-48, start.y+48, 0, start.x-48, start.y-48, 0)
+		myFont:Print("CAUTION", scrX, scrY+30, 20, "cdo")
+		myFont:Print("CAUTION", scrX, scrY+30, 20, "cd")
+		myFont:Print("SAND", scrX, scrY-30, 20, "cao")
+		myFont:Print("SAND", scrX, scrY-30, 20, "ca")
+	end
+	gl.Color(1, 1, 1, 0.5)
 end
 
 
@@ -147,111 +186,70 @@ function widget:Initialize()
 		sandGraph = getSandGraph(sandNodeSize)
 		astar = VFS.Include('a-star-lua/a-star.lua')
 	end
-end
-
-function widget:DrawScreen()
-		if restrictSand or sinkWrecks then
-		
-			if gameStarted and alertCounter == 0 then
-				widgetHandler:RemoveWidget()
-			end
-	
-			local alertOpacity = 1
-			local alertSlide = 1
-			if gameStarted then
-				alertOpacity = alertCounter / 80
-				alertSlide = alertCounter / 80
-			else
-				alertOpacity = (50 - alertCounter) / 50
-				alertSlide = (50 - alertCounter) / 50
-			end
-			local camHeight = Spring.GetCameraState().height
-			if not camHeight then camHeight = 600 end
-		
-			local viewX, viewY, posX, posY = Spring.GetViewGeometry()
-			local centerX = (viewX / 2)
-			local centerY = (viewY / 2)	
-			local alertX = viewX*0.6*alertSlide
-			
-			local camState = Spring.GetCameraState()
-			local sameCam = true
-			for index,value in pairs(camState) do
-				if camState[index] ~= goodCamState[index] then
-					sameCam = false
-					goodCamState = camState
-					break
-				end
-			end
---			Spring.Echo(sameCam)
-			
---			myFont:SetTextColor(1, 0.8, 0.5, alertOpacity)
-			if restrictSand or sinkWrecks or areWorms then
-				gl.Color(1, 0.9, 0.5, 1)
-				myFont:Print(sandTitle, alertX, viewY*0.3, 36, "rvno")
-				myFont:Print(sandTitle, alertX, viewY*0.3, 36, "rvn")
-				myFont:Print(sandWarning, alertX, viewY*0.26, 16, "rvo")
-				myFont:Print(sandWarning, alertX, viewY*0.26, 16, "rv")
-				
-				local sx, sy
-				if sameCam and sandX then
-					sx, sy = sandX, sandY
-				else
-					sx, sy = nearestNodeScreenCoords(viewX*0.8, viewY*0.5, sandGraph, sandNodeDist)
-					if sx then sandX, sandY = sx, sy end
-				end
-				
-				if sx then
-					if sx > viewX*0.65 then
-						drawLandMarker(1.0, 0.9, 0.5, alertOpacity, viewX*0.61*alertSlide, viewY*0.3, sx, sy)
-					else
-						drawLandMarker(1.0, 0.9, 0.5, alertOpacity, viewX*0.61*alertSlide, viewY*0.3, sx, sy, viewX*0.63)
-					end
-				end
-				
-			end
-			
-			if alertCounter > 0 then
-				alertCounter = alertCounter - 1
-			end
-				
-				gl.Color(1, 1, 1, 0.5)
-				-- gl.PopMatrix()
-			
-		end
-	
-end
-
-function widget:DrawWorld()
-	if not gameStarted then
-		gl.DepthTest(false)
-		-- gl.PushMatrix()
-		gl.Color(1, 0, 0, 1)
-		for _,t in ipairs(Spring.GetTeamList()) do
-			local x,y,z = Spring.GetTeamStartPosition(t)
-			if x and x > 0 and z > 0 then
-				local groundType, _ = Spring.GetGroundInfo(x, z)
-				if sandType[groundType] and restrictSand then
-					gl.LineWidth(4)
-					local radius = 64
-					gl.DrawGroundCircle(x, y, z, radius, 16)
-					gl.BeginEnd(GL.LINE_STRIP, DoLine, x-radius, y, z-radius, x+radius, y, z+radius)
-					gl.BeginEnd(GL.LINE_STRIP, DoLine, x+radius, y, z-radius, x-radius, y, z+radius)
-					gl.Translate(x, y, z)
-					gl.Billboard()
-					gl.Text("CAUTION", 0, radius+8, 16, "cd")
-					gl.Text("SAND", 0, -(radius+8), 16, "ca")
-				end
-			end
-		end
-		gl.LineWidth(1)
-		gl.Color(1, 1, 1, 0.5)
-		-- gl.PopMatrix()
-		gl.DepthTest(true)
+	if Game.startPosType ~= 2 then
+		startDelay = 300 -- display alert for 10 seconds if start positions are not chosen in-game
 	end
 end
 
+function widget:Update(dt)
+	if gameStarted and alertCounter == 0 then
+		widgetHandler:RemoveWidget()
+		return
+	end
+	if alertCounter > 0 then
+		alertCounter = alertCounter - 1
+	end
+	local camState = Spring.GetCameraState()
+	if lastAlertCounter == 0 and alertCounter == 0 and startsChanged == -1 and cameraStatesMatch(camState, lastCamState) then
+		return
+	end
+	local alertOpacity = 1
+	local alertSlide = 1
+	if gameStarted then
+		alertOpacity = alertCounter / 80
+		alertSlide = alertCounter / 80
+	else
+		alertOpacity = (50 - alertCounter) / 50
+		alertSlide = (50 - alertCounter) / 50
+	end
+	local viewX, viewY, posX, posY = Spring.GetViewGeometry()
+	local centerX = (viewX / 2)
+	local centerY = (viewY / 2)	
+	local alertX = viewX*0.6*alertSlide
+	local sx, sy = nearestNodeScreenCoords(viewX*0.8, viewY*0.5, sandGraph, sandNodeDist)
+	if not sx then
+		sx, sy = nearestNodeScreenCoords(viewX*0.4, viewY*0.5, sandGraph, sandNodeDist)
+	end
+	if startsChanged == 0 then
+		sandyStarts = {}
+		if (restrictSand or areWorms) and not gameStarted then
+			for _,t in ipairs(Spring.GetTeamList()) do
+				local x,y,z = Spring.GetTeamStartPosition(t)
+				if x and x > 0 and z > 0 then
+					local groundType, _ = Spring.GetGroundInfo(x, z)
+					if sandType[groundType] then
+						table.insert(sandyStarts, {x=x, y=y, z=z,})
+					end
+				end
+			end
+		end
+	end
+	screenDisplayList = gl.CreateList(drawAlerts, viewX, viewY, sx, sy, alertX, alertSlide, alertOpacity, sandyStarts)
+	lastCamState = camState
+	lastAlertCounter = alertCounter
+	startsChanged = math.max(-1, startsChanged - 1)
+end
+
+function widget:MousePress(x, y, button)
+	startsChanged = 1
+end
+
+function widget:DrawScreen()
+	gl.CallList(screenDisplayList)
+end
+
 function widget:GameFrame(f)
-	if f > 1 and not gameStarted then
+	if f > startDelay and not gameStarted then
 		gameStarted = true
 		alertCounter = 80
 	end

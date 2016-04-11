@@ -63,7 +63,7 @@ local options = {
 
 	{
 		key	= 'sworm_aggression',
-		name	= 'Worm Aggression',
+		name	= 'Aggression',
 		desc	= 'How much do your units on the sand attract more worms?',
 		type   = "number",
 		section = '2_sworm_sect',
