@@ -1026,7 +1026,7 @@ local function wormSpawn(x, z)
 		end
 		-- spEcho(largestSandUnitSize, box.largestUnitSize, wormSizes[size].maxMealSize, size)
 		local uDef = UnitDefNames[wormSizes[size].unitName]
-		local range = mCeil(((speed * attackEvalFrequency) / 2) + (uDef.radius * 1.4))
+		local range = mCeil( (attackEvalFrequency / speed) + uDef.radius )
 		local second = spGetGameSeconds()
 		local frame = spGetGameFrame()
 		local w = { 
