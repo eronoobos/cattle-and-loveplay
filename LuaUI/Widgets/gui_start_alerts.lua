@@ -27,12 +27,11 @@ local sandTitle
 local sandWarning
 
 local alertCounter
+local nodeX, nodeY, nodeZ
 local myHeaderFont
 local myFont
 local sizeX = Game.mapSizeX 
 local sizeZ = Game.mapSizeZ
-local sandyStarts = {}
-local startsChanged = 1
 
 local screenDisplayList = 0
 
@@ -77,13 +76,12 @@ local function DoLine(x1, y1, z1, x2, y2, z2)
     gl.Vertex(x2, y2, z2)
 end
 
-local function nearestNodeScreenCoords(sx, sy, nodes, nodeDist)
+local function nearestNodeAtScreenCoords(sx, sy, nodes, nodeDist)
 	local _, pos = Spring.TraceScreenRay(sx, sy, true)
 	if pos then
 		local node = astar.nearest_node(pos[1], pos[3], nodes, nodeDist)
 		if node then
-			local nsx, nsy = Spring.WorldToScreenCoords(node.x, Spring.GetGroundHeight(node.x, node.y), node.y)
-			return nsx, nsy
+			return node.x, Spring.GetGroundHeight(node.x, node.y), node.y
 		end
 	end
 end
@@ -118,7 +116,14 @@ local function drawLandMarker(r, g, b, a, x1, y1, x2, y2, x3)
 	end
 end
 
-local function drawAlerts(viewX, viewY, sx, sy, alertX, alertSlide, alertOpacity, sandyStarts)
+local function drawStartPosCaution(scrX,scrY)
+	myFont:Print("CAUTION", scrX, scrY+30, 20, "cdo")
+	myFont:Print("CAUTION", scrX, scrY+30, 20, "cd")
+	myFont:Print("SAND", scrX, scrY-30, 20, "cao")
+	myFont:Print("SAND", scrX, scrY-30, 20, "ca")
+end
+
+local function drawAlerts(viewX, viewY, sx, sy, alertX, alertSlide, alertOpacity)
 	gl.Color(1, 0.9, 0.5, 1)
 	myFont:Print(sandTitle, alertX, viewY*0.3, 36, "rvno")
 	myFont:Print(sandTitle, alertX, viewY*0.3, 36, "rvn")
@@ -130,19 +135,6 @@ local function drawAlerts(viewX, viewY, sx, sy, alertX, alertSlide, alertOpacity
 		else
 			drawLandMarker(1.0, 0.9, 0.5, alertOpacity, viewX*0.61*alertSlide, viewY*0.3, sx, sy, viewX*0.63)
 		end
-	end
-	gl.Color(1, 0, 0, 1)
-	gl.LineWidth(4)
-	for _, start in pairs(sandyStarts) do
-		local scrX, scrY = Spring.WorldToScreenCoords(start.x,start.y,start.z)
-		-- gl.BeginEnd(GL.LINE_STRIP, DoLine, start.x-48, start.y-48, 0, start.x+48, start.y-48, 0)
-		-- gl.BeginEnd(GL.LINE_STRIP, DoLine, start.x+48, start.y-48, 0, start.x+48, start.y+48, 0)
-		-- gl.BeginEnd(GL.LINE_STRIP, DoLine, start.x+48, start.y+48, 0, start.x-48, start.y+48, 0)
-		-- gl.BeginEnd(GL.LINE_STRIP, DoLine, start.x-48, start.y+48, 0, start.x-48, start.y-48, 0)
-		myFont:Print("CAUTION", scrX, scrY+30, 20, "cdo")
-		myFont:Print("CAUTION", scrX, scrY+30, 20, "cd")
-		myFont:Print("SAND", scrX, scrY-30, 20, "cao")
-		myFont:Print("SAND", scrX, scrY-30, 20, "ca")
 	end
 	gl.Color(1, 1, 1, 0.5)
 end
@@ -200,7 +192,8 @@ function widget:Update(dt)
 		alertCounter = alertCounter - 1
 	end
 	local camState = Spring.GetCameraState()
-	if lastAlertCounter == 0 and alertCounter == 0 and startsChanged == -1 and cameraStatesMatch(camState, lastCamState) then
+	local camsMatch =  cameraStatesMatch(camState, lastCamState)
+	if lastAlertCounter == 0 and alertCounter == 0 and camsMatch then
 		return
 	end
 	local alertOpacity = 1
@@ -216,35 +209,42 @@ function widget:Update(dt)
 	local centerX = (viewX / 2)
 	local centerY = (viewY / 2)	
 	local alertX = viewX*0.6*alertSlide
-	local sx, sy = nearestNodeScreenCoords(viewX*0.8, viewY*0.5, sandGraph, sandNodeDist)
-	if not sx then
-		sx, sy = nearestNodeScreenCoords(viewX*0.4, viewY*0.5, sandGraph, sandNodeDist)
-	end
-	if startsChanged == 0 then
-		sandyStarts = {}
-		if (restrictSand or areWorms) and not gameStarted then
-			for _,t in ipairs(Spring.GetTeamList()) do
-				local x,y,z = Spring.GetTeamStartPosition(t)
-				if x and x > 0 and z > 0 then
-					local groundType, _ = Spring.GetGroundInfo(x, z)
-					if sandType[groundType] then
-						table.insert(sandyStarts, {x=x, y=y, z=z,})
-					end
+	if not camsMatch or not nodeX then
+		nodeX, nodeY, nodeZ = nearestNodeAtScreenCoords(viewX*0.8, viewY*0.5, sandGraph, sandNodeDist)
+		if not nodeX then
+			nodeX, nodeY, nodeZ = nearestNodeAtScreenCoords(viewX*0.4, viewY*0.5, sandGraph, sandNodeDist)
+			if not nodeX then
+				nodeX, nodeY, nodeZ = nearestNodeAtScreenCoords(viewX*0.5, viewY*0.2, sandGraph, sandNodeDist)
+				if not nodeX then
+					nodeX, nodeY, nodeZ = nearestNodeAtScreenCoords(viewX*0.5, viewY*0.8, sandGraph, sandNodeDist)
 				end
 			end
 		end
 	end
+	local sx, sy
+	if nodeX then
+		sx, sy = Spring.WorldToScreenCoords(nodeX, nodeY, nodeZ)
+	end
 	screenDisplayList = gl.CreateList(drawAlerts, viewX, viewY, sx, sy, alertX, alertSlide, alertOpacity, sandyStarts)
 	lastCamState = camState
 	lastAlertCounter = alertCounter
-	startsChanged = math.max(-1, startsChanged - 1)
-end
-
-function widget:MousePress(x, y, button)
-	startsChanged = 1
 end
 
 function widget:DrawScreen()
+	if (restrictSand or areWorms) and not gameStarted then
+		gl.Color(1, 0, 0, 1)
+		for _,t in ipairs(Spring.GetTeamList()) do
+			local x,y,z = Spring.GetTeamStartPosition(t)
+			if x and x > 0 and z > 0 then
+				local groundType, _ = Spring.GetGroundInfo(x, z)
+				if sandType[groundType] then
+					local scrX, scrY = Spring.WorldToScreenCoords(x,y,z)
+					drawStartPosCaution(scrX,scrY)
+				end
+			end
+		end
+		gl.Color(1, 1, 1, 0.5)
+	end
 	gl.CallList(screenDisplayList)
 end
 
