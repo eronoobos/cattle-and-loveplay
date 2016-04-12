@@ -78,7 +78,8 @@ local sizeZ = Game.mapSizeZ
 
 --sounds, see gamedata/sounds.lua
 local quakeSnds = { "WmQuake1", "WmQuake2", "WmQuake3", "WmQuake4" }
-local lightningSnds = { "WmLightning1", "WmLightning2", "WmLightning3", "WmLightning4", "WmLightning5" }
+local lightningLittleSnds = { "WmLightning2", "WmLightning3" }
+local lightningMediumSnds = { "WmLightning4", "WmLightning5" }
 local thunderSnds = { "WmThunder1", "WmThunder2", "WmThunder3", "WmThunder4", "WmThunder5" }
 
 -- localized functions
@@ -90,6 +91,8 @@ local mSin = math.sin
 local pi = math.pi
 local twicePi = math.pi * 2
 local halfPi = math.pi / 2
+local thirdPi = math.pi / 3
+local twoThirdsPi = thirdPi * 2
 local quarterPi = math.pi / 4
 local mMax = math.max
 local mMin = math.min
@@ -417,13 +420,13 @@ local function getWormSizes(sizesByUnitName)
 		local nodeSize = math.ceil(uDef.radius * 2.1)
 		local wormGraph = getWormPathGraph(nodeSize)
 		local nodeDist = 1+ (2 * (nodeSize^2))
-		local valid_node_func = function ( node, neighbor ) 
+		local neighbor_node_func = function ( node, neighbor ) 
 			if astar.distance( node.x, node.y, neighbor.x, neighbor.y) < nodeDist then
 				return true
 			end
 			return false
 		end
-		local size = { radius = uDef.radius, diameter = uDef.radius * 2, maxMealSize = mCeil(uDef.radius * 0.888), unitName = unitName, badTargets = {}, wormGraph = wormGraph, valid_node_func = valid_node_func, nodeSize = nodeSize }
+		local size = { radius = uDef.radius, diameter = uDef.radius * 2, maxMealSize = mCeil(uDef.radius * 0.888), unitName = unitName, badTargets = {}, wormGraph = wormGraph, neighbor_node_func = neighbor_node_func, nodeSize = nodeSize }
 		sizes[s] = size
 	end
 	return sizes
@@ -588,15 +591,52 @@ local function wormTargetting()
 	return num, mCeil(totalMovement)
 end
 
-local function signArcLightning(x, z, arcLength, heightDivisor, segLength, lightningCeg, flashCeg)
-	arcLength = arcLength or 48
+-- local function signArcLightning(x, z, arcLength, heightDivisor, segLength, lightningCeg, flashCeg)
+-- 	arcLength = arcLength or 48
+-- 	heightDivisor = heightDivisor or 1
+-- 	segLength = segLength or 16
+-- 	lightningCeg = lightningCeg or "WORMSIGN_LIGHTNING_SMALL"
+-- 	flashCeg = flashCeg or "WORMSIGN_FLASH_SMALL"
+-- 	local y = spGetGroundHeight(x, z)
+-- 	local xrand = (2*mRandom()) - 1
+-- 	local zrand = (2*mRandom()) - 1
+-- 	local ly = 0
+-- 	local lx = 0
+-- 	local lz = 0
+-- 	local i = 0
+-- 	local gh = y+arcLength
+-- 	repeat
+-- 		ly =  arcLength * ((0.25-(((i/arcLength)-0.5)^2)) / heightDivisor)
+-- 		local cx = x+lx
+-- 		local cy = y+ly
+-- 		local cz = z+lz
+-- 		spSpawnCEG(lightningCeg,cx,cy,cz,0,1,0,2,0)
+-- 		if i % segLength == 0 then
+-- 			xrand = (2*mRandom()) - 1
+-- 			zrand = (2*mRandom()) - 1
+-- 			gh = spGetGroundHeight(cx,cz)
+-- 		end
+-- 		lx = lx + xrand
+-- 		lz = lz + zrand
+-- 		i = i + 1
+-- 	until cy < gh
+-- 	spSpawnCEG(flashCeg,x,y,z,0,1,0,2,0)
+-- 	spSpawnCEG(flashCeg,x+lx-xrand,y+ly,z+lz-zrand,0,1,0,2,0)
+-- end
+
+local function signArcLightning(x1, z1, x2, z2, heightDivisor, segLength, lightningCeg, flashCeg)
 	heightDivisor = heightDivisor or 1
 	segLength = segLength or 16
 	lightningCeg = lightningCeg or "WORMSIGN_LIGHTNING_SMALL"
 	flashCeg = flashCeg or "WORMSIGN_FLASH_SMALL"
-	local y = spGetGroundHeight(x, z)
-	local xrand = (2*mRandom()) - 1
-	local zrand = (2*mRandom()) - 1
+	local arcLength = DistanceXZ(x1, z1, x2, z2)
+	local arcAngle = AngleXYXY(x1, z1, x2, z2)
+	-- local minAngle = AngleAdd(arcAngle, -thirdPi)
+	-- local maxAngle = AngleAdd(arcAngle, thirdPi)
+	local angle = AngleAdd( arcAngle, ((mRandom() * pi) - halfPi) )
+	local xrand, zrand = CirclePos(0, 0, 1, angle)
+	local y = spGetGroundHeight(x1, z1)
+	local angle 
 	local ly = 0
 	local lx = 0
 	local lz = 0
@@ -604,43 +644,52 @@ local function signArcLightning(x, z, arcLength, heightDivisor, segLength, light
 	local gh = y+arcLength
 	repeat
 		ly =  arcLength * ((0.25-(((i/arcLength)-0.5)^2)) / heightDivisor)
-		local cx = x+lx
+		local cx = x1+lx
 		local cy = y+ly
-		local cz = z+lz
+		local cz = z1+lz
 		spSpawnCEG(lightningCeg,cx,cy,cz,0,1,0,2,0)
 		if i % segLength == 0 then
-			xrand = (2*mRandom()) - 1
-			zrand = (2*mRandom()) - 1
+			angle = AngleAdd( arcAngle, ((mRandom() * twoThirdsPi) - thirdPi) )
+			xrand, zrand = CirclePos(0, 0, 1, angle)
 			gh = spGetGroundHeight(cx,cz)
 		end
 		lx = lx + xrand
 		lz = lz + zrand
 		i = i + 1
 	until cy < gh
-	spSpawnCEG(flashCeg,x,y,z,0,1,0,2,0)
-	spSpawnCEG(flashCeg,x+lx-xrand,y+ly,z+lz-zrand,0,1,0,2,0)
+	spSpawnCEG(flashCeg,x1,y,z1,0,1,0,2,0)
+	spSpawnCEG(flashCeg,x2,spGetGroundHeight(x2,z2),z2,0,1,0,2,0)
+end
+
+local function arcLightningOverPoint(x, z, arcLength, heightDivisor, segLength, lightningCeg, flashCeg)
+	local angle1 = mRandom() * twicePi
+	local angle2 = AngleAdd(angle1, pi)
+	local radius = arcLength / 2
+	local x1, z1 = CirclePos(x, z, radius, angle1)
+	local x2, z2 = CirclePos(x, z, radius, angle2)
+	signArcLightning(x1, z1, x2, z2, heightDivisor, segLength, lightningCeg, flashCeg)
 end
 
 local function wormBigSign(w)
 	local sx = w.x
 	local sz = w.z
+	local sy = spGetGroundHeight(sx, sz)
 	local minArc = mCeil(w.size.radius * 8)
 	local maxArc = mCeil(w.size.radius * 10)
-	signArcLightning( sx, sz, mRandom(minArc,maxArc), 1+mRandom(), 32, "WORMSIGN_LIGHTNING", "WORMSIGN_FLASH" )
+	-- signArcLightning( sx, sz, mRandom(minArc,maxArc), 1+mRandom(), 32, "WORMSIGN_LIGHTNING", "WORMSIGN_FLASH" )
+	arcLightningOverPoint( sx, sz, mRandom(minArc, maxArc), 2, 32, "WORMSIGN_LIGHTNING", "WORMSIGN_FLASH" )
 	local snd = thunderSnds[mRandom(#thunderSnds)]
-	spPlaySoundFile(snd,0.5,sx,sy,sz)
+	spPlaySoundFile(snd,0.75,sx,sy,sz)
 end
 
 local function wormMediumSign(w)
 	if not w then return end
-	local sx, sz = CirclePos(w.x, w.z, w.size.radius)
-	local num = mRandom(1,2)
-	local minArc = mCeil(w.size.radius * 3)
-	local maxArc = mCeil(w.size.radius * 6)
-	for n=1,num do
-		signArcLightning( sx, sz, mRandom(minArc,maxArc), mRandom(1,3), 24 )
-	end
-	local snd = lightningSnds[mRandom(#lightningSnds)]
+	local angle = mRandom() * twicePi
+	local sx1, sz1 = CirclePos(w.x, w.z, w.size.radius*0.5, angle)
+	local sx2, sz2 = CirclePos(w.x, w.z, w.size.diameter, angle)
+	-- signArcLightning( sx1, sz1, mRandom(minArc,maxArc), mRandom(1,3), 24 )
+	signArcLightning( sx1, sz1, sx2, sz2, mRandom(1,3), 24 )
+	local snd = lightningMediumSnds[mRandom(#lightningMediumSnds)]
 	spPlaySoundFile(snd,0.1,sx,sy,sz)
 end
 
@@ -651,16 +700,17 @@ local function wormLittleSign(w, sx, sz)
 	local num = mRandom(1,2)
 	local minArc, maxArc
 	if w then
-		minArc = mCeil(w.size.radius / 1.5)
-		maxArc = mCeil(w.size.radius * 2.5)
+		minArc = mCeil(w.size.radius)
+		maxArc = mCeil(w.size.diameter)
 	else
 		minArc = 24
 		maxArc = 96
 	end
 	for n=1,num do
-		signArcLightning( sx, sz, mRandom(minArc, maxArc), mRandom(2,5) )
+		-- signArcLightning( sx, sz, mRandom(minArc, maxArc), mRandom(2,5) )
+		arcLightningOverPoint( sx, sz, mRandom(minArc, maxArc), mRandom(2,5) )
 	end
-	local snd = lightningSnds[mRandom(#lightningSnds)]
+	local snd = lightningLittleSnds[mRandom(#lightningLittleSnds)]
 	spPlaySoundFile(snd,0.1,sx,sy,sz)
 end
 
@@ -701,7 +751,7 @@ local function wormDirect(w)
 			if startNode then
 				local goalNode = nodeHere(tx, tz, graph, w.size.nodeSize)
 				if goalNode and startNode ~= goalNode then
-					w.path = astar.path(startNode, goalNode, graph, false, w.size.valid_node_func)
+					w.path = astar.path(startNode, goalNode, graph, false, w.size.neighbor_node_func)
 					if w.path then
 						if not w.path[2] then
 							w.pathStep = 1
@@ -889,7 +939,7 @@ local function doWormMovementAndEffects(gf, second)
 		end
 		local quake = mRandom() < 0.0015
 		local lightning = mRandom() < 0.01
-		local dust = mRandom() < 0.25
+		local dust = mRandom() < 0.2
 		if quake then
 			local y = spGetGroundHeight(w.x, w.z)
 			local snd = quakeSnds[mRandom(#quakeSnds)]
@@ -904,11 +954,11 @@ local function doWormMovementAndEffects(gf, second)
 				spSpawnCEG("sworm_dust",cegx,cegy,cegz,0,1,0,30,0)
 			end
 		end
-		if lightning then
+		if lightning and not w.emergedID then
 			if mRandom() < 0.15 then
 				wormBigSign(w)
 			else
-				wormLittleSign(w, cegx, cegz)
+				wormLittleSign(w)
 			end
 		end
 		if w.emergedID and mRandom() < 0.015 then
