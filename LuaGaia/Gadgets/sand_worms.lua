@@ -160,6 +160,22 @@ local function randomXYZ()
 	return mRandom(sizeX), 0, mRandom(sizeZ)
 end
 
+local function normalizeVector(...)
+	local dist = 0
+	local arg = {...}
+	for _, a in pairs(arg) do
+		dist = dist + (a^2)
+	end
+	dist = mSqrt(dist)
+	if dist == 0 then return ..., 0 end
+	local v = {}
+	for _, a in pairs(arg) do
+		tInsert(v, a/dist)
+	end
+	tInsert(v, dist)
+	return unpack(v)
+end
+
 local function AngleAdd(angle1, angle2)
   return (angle1 + angle2) % twicePi
 end
@@ -624,62 +640,78 @@ end
 -- 	spSpawnCEG(flashCeg,x+lx-xrand,y+ly,z+lz-zrand,0,1,0,2,0)
 -- end
 
-local function signArcLightning(x1, z1, x2, z2, heightDivisor, segLength, lightningCeg, flashCeg)
+local function drawCegLine(x1, y1, z1, x2, y2, z2, ceg, spacing)
+	spacing = spacing or 1
+	ceg = ceg or "WORMSIGN_LIGHTNING_SMALL"
+	local vx, vy, vz, dist = normalizeVector(x2-x1, y2-y1, z2-z1)
+	for i = 0, dist, spacing do
+		spSpawnCEG(ceg, x1+i*vx, y1+i*vy, z1+i*vz, 0, 1, 0, 2, 0)
+	end
+end
+
+local function signArcLightning(x1, z1, x2, z2, heightDivisor, segLength, branchNum, start, lightningCeg, flashCeg)
 	heightDivisor = heightDivisor or 1
 	segLength = segLength or 16
+	branchNum = branchNum or 0
+	start = start or 0
 	lightningCeg = lightningCeg or "WORMSIGN_LIGHTNING_SMALL"
 	flashCeg = flashCeg or "WORMSIGN_FLASH_SMALL"
+	local minSegLength = segLength * 0.5
+	local maxSegLength = segLength * 1.5
 	local arcLength = DistanceXZ(x1, z1, x2, z2)
-	local arcAngle = AngleXYXY(x1, z1, x2, z2)
-	-- local minAngle = AngleAdd(arcAngle, -thirdPi)
-	-- local maxAngle = AngleAdd(arcAngle, thirdPi)
-	local angle = AngleAdd( arcAngle, ((mRandom() * pi) - halfPi) )
-	local xrand, zrand = CirclePos(0, 0, 1, angle)
-	local y = spGetGroundHeight(x1, z1)
-	local angle 
+	local vx, vz = normalizeVector(x2-x1, z2-z1)
+	local y1 = spGetGroundHeight(x1, z1)
 	local ly = 0
 	local lx = 0
 	local lz = 0
+	local ih = mCeil(start * arcLength)
 	local i = 0
-	local gh = y+arcLength
+	local points = {}
 	repeat
-		ly =  arcLength * ((0.25-(((i/arcLength)-0.5)^2)) / heightDivisor)
-		local cx = x1+lx
-		local cy = y+ly
-		local cz = z1+lz
-		spSpawnCEG(lightningCeg,cx,cy,cz,0,1,0,2,0)
-		if i % segLength == 0 then
-			angle = AngleAdd( arcAngle, ((mRandom() * twoThirdsPi) - thirdPi) )
-			xrand, zrand = CirclePos(0, 0, 1, angle)
-			gh = spGetGroundHeight(cx,cz)
+		local ly =  arcLength * ((0.25-(((ih/arcLength)-0.5)^2)) / heightDivisor)
+		local lx = vx * i
+		local lz = vz * i
+		table.insert(points, {i=i, x=lx, y=ly, z=lz})
+		i = i + mRandom(minSegLength, maxSegLength)
+	until i >= arcLength
+	for pi, p in ipairs(points) do
+		p.x = p.x + mRandom(-segLength, segLength)
+		p.y = mMax(0, p.y + mRandom(0, segLength))
+		p.z = p.z + mRandom(-segLength, segLength)
+		if pi > 1 then
+			local lp = points[pi-1]
+			drawCegLine(x1+lp.x, y1+lp.y, z1+lp.z, x1+p.x, y1+p.y, z1+p.z, lightningCeg)
 		end
-		lx = lx + xrand
-		lz = lz + zrand
-		i = i + 1
-	until cy < gh
-	spSpawnCEG(flashCeg,x1,y,z1,0,1,0,2,0)
+	end
+	if branchNum > 0 and #points > 3 then
+		for b = 1, branchNum do
+			local p = tRemove(points, mRandom(2, #points-1))
+			local bx2, bz2 = CirclePos(p.x, p.z, arcLength-p.i)
+			signArcLightning(p.x, p.z, bx2, bz2, heightDivisor, segLength, 0, p.i/arcLength, lightningCeg, flashCeg)
+			if #points < 4 then break end
+		end
+	end
+	spSpawnCEG(flashCeg,x1,y1,z1,0,1,0,2,0)
 	spSpawnCEG(flashCeg,x2,spGetGroundHeight(x2,z2),z2,0,1,0,2,0)
 end
 
-local function arcLightningOverPoint(x, z, arcLength, heightDivisor, segLength, lightningCeg, flashCeg)
+local function arcLightningOverPoint(x, z, arcLength, heightDivisor, segLength, branchNum, start, lightningCeg, flashCeg)
 	local angle1 = mRandom() * twicePi
 	local angle2 = AngleAdd(angle1, pi)
 	local radius = arcLength / 2
 	local x1, z1 = CirclePos(x, z, radius, angle1)
 	local x2, z2 = CirclePos(x, z, radius, angle2)
-	signArcLightning(x1, z1, x2, z2, heightDivisor, segLength, lightningCeg, flashCeg)
+	signArcLightning(x1, z1, x2, z2, heightDivisor, segLength, branchNum, start, lightningCeg, flashCeg)
 end
 
 local function wormBigSign(w)
-	local sx = w.x
-	local sz = w.z
-	local sy = spGetGroundHeight(sx, sz)
 	local minArc = mCeil(w.size.radius * 8)
 	local maxArc = mCeil(w.size.radius * 10)
-	-- signArcLightning( sx, sz, mRandom(minArc,maxArc), 1+mRandom(), 32, "WORMSIGN_LIGHTNING", "WORMSIGN_FLASH" )
-	arcLightningOverPoint( sx, sz, mRandom(minArc, maxArc), 2, 32, "WORMSIGN_LIGHTNING", "WORMSIGN_FLASH" )
+	local sx, sz = CirclePos(w.x, w.z, mRandom(minArc, maxArc))
+	signArcLightning( w.x, w.z, sx, sz, 2, 16, mRandom(1,3), 0, "WORMSIGN_LIGHTNING", "WORMSIGN_FLASH" )
 	local snd = thunderSnds[mRandom(#thunderSnds)]
-	spPlaySoundFile(snd,0.75,sx,sy,sz)
+	local y = spGetGroundHeight(w.x, w.z)
+	spPlaySoundFile(snd,0.75,w.x,y,w.z)
 end
 
 local function wormMediumSign(w)
@@ -688,7 +720,7 @@ local function wormMediumSign(w)
 	local sx1, sz1 = CirclePos(w.x, w.z, w.size.radius*0.5, angle)
 	local sx2, sz2 = CirclePos(w.x, w.z, w.size.diameter, angle)
 	-- signArcLightning( sx1, sz1, mRandom(minArc,maxArc), mRandom(1,3), 24 )
-	signArcLightning( sx1, sz1, sx2, sz2, mRandom(1,3), 24 )
+	signArcLightning( sx1, sz1, sx2, sz2, mRandom(1,3), 16, mRandom(0,3) )
 	local snd = lightningMediumSnds[mRandom(#lightningMediumSnds)]
 	spPlaySoundFile(snd,0.1,sx,sy,sz)
 end
@@ -697,7 +729,6 @@ local function wormLittleSign(w, sx, sz)
 	if not w and not sx then return end
 	sx = sx or w.x
 	sz = sz or w.z
-	local num = mRandom(1,2)
 	local minArc, maxArc
 	if w then
 		minArc = mCeil(w.size.radius)
@@ -706,20 +737,10 @@ local function wormLittleSign(w, sx, sz)
 		minArc = 24
 		maxArc = 96
 	end
-	for n=1,num do
-		-- signArcLightning( sx, sz, mRandom(minArc, maxArc), mRandom(2,5) )
-		arcLightningOverPoint( sx, sz, mRandom(minArc, maxArc), mRandom(2,5) )
-	end
+	-- signArcLightning( sx, sz, mRandom(minArc, maxArc), mRandom(2,5) )
+	arcLightningOverPoint( sx, sz, mRandom(minArc, maxArc), mRandom(2,5), 8, mRandom(0,2) )
 	local snd = lightningLittleSnds[mRandom(#lightningLittleSnds)]
 	spPlaySoundFile(snd,0.1,sx,sy,sz)
-end
-
-local function normalizeVector(vx, vz)
-	local dist = mSqrt( (vx^2) + (vz^2) )
-	if dist == 0 then return vx, vz end
-	vx = vx / dist
-	vz = vz / dist
-	return vx, vz
 end
 
 local function wormMoveUnderUnit(w)

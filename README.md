@@ -253,12 +253,13 @@ v6 -> v7
 - / use displaylists in start alerts
 - / remove ripple signs
 - / rename valid_node_func to neighbor_node_func
-- build helper requests isNotValid, sand restrict gadget provides on demand
 - / distinguish between little and medium lightning with sounds
+- / branching lightning? and lightning arcing over underworm: http://gamedevelopment.tutsplus.com/tutorials/how-to-generate-shockingly-good-2d-lightning-effects--gamedev-2681
+- lightning is too linear. needs to curve around the Y axis randomly
+- build helper requests isNotValid, sand restrict gadget provides on demand
 - update build pic
 - remove worm radar
 - worm radar highlights w/ crosshair in minimap and edge arrows when new worm appears or when one of your units is being eaten. this can all be found out without passing info from gadget.
-- branching lightning? and lightning arcing over underworm: http://gamedevelopment.tutsplus.com/tutorials/how-to-generate-shockingly-good-2d-lightning-effects--gamedev-2681
 - add nighttime dust and dirt ceg bitmaps
 - delete unecessary files
 - fix unitscript errors (check if piece is valid before exploding it?)
