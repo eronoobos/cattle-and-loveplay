@@ -626,9 +626,9 @@ local function drawCegLine(x1, y1, z1, x2, y2, z2, ceg, spacing)
 end
 
 local function signArcLightning(x1, z1, x2, z2, offsetMult, generationNum, branchProb, lightningCeg, flashCeg, minOffsetMultXZ, minOffsetMultY)
-	offsetMult = offsetMult or 0.3
-	generationNum = generationNum or 5
-	branchProb = branchProb or 0.2
+	offsetMult = offsetMult or 0.4
+	generationNum = generationNum or 4
+	branchProb = branchProb or 0.25
 	lightningCeg = lightningCeg or "WORMSIGN_LIGHTNING_SMALL"
 	flashCeg = flashCeg or "WORMSIGN_FLASH_SMALL"
 	minOffsetMultXZ = minOffsetXZ or 0.05
@@ -680,7 +680,7 @@ local function wormBigSign(w)
 	local minArc = mCeil(w.size.radius * 8)
 	local maxArc = mCeil(w.size.radius * 10)
 	local sx, sz = CirclePos(w.x, w.z, mRandom(minArc, maxArc))
-	signArcLightning( w.x, w.z, sx, sz, nil, nil, nil, "WORMSIGN_LIGHTNING", "WORMSIGN_FLASH" )
+	signArcLightning( w.x, w.z, sx, sz, nil, 6, nil, "WORMSIGN_LIGHTNING", "WORMSIGN_FLASH" )
 	local snd = thunderSnds[mRandom(#thunderSnds)]
 	local y = spGetGroundHeight(w.x, w.z)
 	spPlaySoundFile(snd,0.75,w.x,y,w.z)
@@ -691,7 +691,7 @@ local function wormMediumSign(w)
 	local angle = mRandom() * twicePi
 	local sx1, sz1 = CirclePos(w.x, w.z, w.size.radius*0.5, angle)
 	local sx2, sz2 = CirclePos(w.x, w.z, w.size.diameter, angle)
-	signArcLightning( sx1, sz1, sx2, sz2 )
+	signArcLightning( sx1, sz1, sx2, sz2, nil, 5 )
 	local snd = lightningMediumSnds[mRandom(#lightningMediumSnds)]
 	spPlaySoundFile(snd,0.1,sx,sy,sz)
 end
