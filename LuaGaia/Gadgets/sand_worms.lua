@@ -94,6 +94,7 @@ local halfPi = math.pi / 2
 local thirdPi = math.pi / 3
 local twoThirdsPi = thirdPi * 2
 local quarterPi = math.pi / 4
+local eighthPi = math.pi / 8
 local mMax = math.max
 local mMin = math.min
 local mCeil = math.ceil
@@ -174,6 +175,14 @@ local function normalizeVector(...)
 	end
 	tInsert(v, dist)
 	return unpack(v)
+end
+
+local function perpendicularVector2d(vx, vz)
+	if mRandom(1,2) == 1 then
+		return -vz, vx
+	else
+		return vz, -vx
+	end 
 end
 
 local function AngleAdd(angle1, angle2)
@@ -607,39 +616,6 @@ local function wormTargetting()
 	return num, mCeil(totalMovement)
 end
 
--- local function signArcLightning(x, z, arcLength, heightDivisor, segLength, lightningCeg, flashCeg)
--- 	arcLength = arcLength or 48
--- 	heightDivisor = heightDivisor or 1
--- 	segLength = segLength or 16
--- 	lightningCeg = lightningCeg or "WORMSIGN_LIGHTNING_SMALL"
--- 	flashCeg = flashCeg or "WORMSIGN_FLASH_SMALL"
--- 	local y = spGetGroundHeight(x, z)
--- 	local xrand = (2*mRandom()) - 1
--- 	local zrand = (2*mRandom()) - 1
--- 	local ly = 0
--- 	local lx = 0
--- 	local lz = 0
--- 	local i = 0
--- 	local gh = y+arcLength
--- 	repeat
--- 		ly =  arcLength * ((0.25-(((i/arcLength)-0.5)^2)) / heightDivisor)
--- 		local cx = x+lx
--- 		local cy = y+ly
--- 		local cz = z+lz
--- 		spSpawnCEG(lightningCeg,cx,cy,cz,0,1,0,2,0)
--- 		if i % segLength == 0 then
--- 			xrand = (2*mRandom()) - 1
--- 			zrand = (2*mRandom()) - 1
--- 			gh = spGetGroundHeight(cx,cz)
--- 		end
--- 		lx = lx + xrand
--- 		lz = lz + zrand
--- 		i = i + 1
--- 	until cy < gh
--- 	spSpawnCEG(flashCeg,x,y,z,0,1,0,2,0)
--- 	spSpawnCEG(flashCeg,x+lx-xrand,y+ly,z+lz-zrand,0,1,0,2,0)
--- end
-
 local function drawCegLine(x1, y1, z1, x2, y2, z2, ceg, spacing)
 	spacing = spacing or 1
 	ceg = ceg or "WORMSIGN_LIGHTNING_SMALL"
@@ -649,66 +625,62 @@ local function drawCegLine(x1, y1, z1, x2, y2, z2, ceg, spacing)
 	end
 end
 
-local function signArcLightning(x1, z1, x2, z2, heightDivisor, segLength, branchNum, start, lightningCeg, flashCeg)
-	heightDivisor = heightDivisor or 1
-	segLength = segLength or 16
-	branchNum = branchNum or 0
-	start = start or 0
+local function signArcLightning(x1, z1, x2, z2, offsetMult, generationNum, branchProb, lightningCeg, flashCeg, minOffsetMultXZ, minOffsetMultY)
+	offsetMult = offsetMult or 0.3
+	generationNum = generationNum or 5
+	branchProb = branchProb or 0.2
 	lightningCeg = lightningCeg or "WORMSIGN_LIGHTNING_SMALL"
 	flashCeg = flashCeg or "WORMSIGN_FLASH_SMALL"
-	local minSegLength = segLength * 0.5
-	local maxSegLength = segLength * 1.5
-	local arcLength = DistanceXZ(x1, z1, x2, z2)
-	local vx, vz = normalizeVector(x2-x1, z2-z1)
-	local y1 = spGetGroundHeight(x1, z1)
-	local ly = 0
-	local lx = 0
-	local lz = 0
-	local ih = mCeil(start * arcLength)
-	local i = 0
-	local points = {}
-	repeat
-		local ly =  arcLength * ((0.25-(((ih/arcLength)-0.5)^2)) / heightDivisor)
-		local lx = vx * i
-		local lz = vz * i
-		table.insert(points, {i=i, x=lx, y=ly, z=lz})
-		i = i + mRandom(minSegLength, maxSegLength)
-	until i >= arcLength
-	for pi, p in ipairs(points) do
-		p.x = p.x + mRandom(-segLength, segLength)
-		p.y = mMax(0, p.y + mRandom(0, segLength))
-		p.z = p.z + mRandom(-segLength, segLength)
-		if pi > 1 then
-			local lp = points[pi-1]
-			drawCegLine(x1+lp.x, y1+lp.y, z1+lp.z, x1+p.x, y1+p.y, z1+p.z, lightningCeg)
+	minOffsetMultXZ = minOffsetXZ or 0.05
+	minOffsetMultY = minOffsetY or 0.1
+	local y1, y2 = spGetGroundHeight(x1, z1), spGetGroundHeight(x2, z2)
+	local segmentList = { {init = {x=x1,y=y1,z=z1}, term = {x=x2,y=y2,z=z2}} }
+	for g = 1, generationNum do
+		local newSegmentList = {}
+		for s = #segmentList, 1, -1 do
+			local seg = tRemove(segmentList, s)
+			local midX = (seg.init.x + seg.term.x) / 2
+			local midY = (seg.init.y + seg.term.y) / 2
+			local midZ = (seg.init.z + seg.term.z) / 2
+			local vx, vz, dist = normalizeVector(seg.term.x-seg.init.x, seg.term.z-seg.init.z)
+			local pvx, pvz = perpendicularVector2d(vx, vz)
+			local offMax = dist * offsetMult
+			local offsetXZ = mRandom(dist*minOffsetMultXZ, dist*offsetMult)
+			midX, midZ = midX+(pvx*offsetXZ), midZ+(pvz*offsetXZ)
+			midY = mMax( spGetGroundHeight(midX,midZ), midY+mRandom(dist*minOffsetMultY,offMax) )
+			local mid = {x=midX, y=midY, z=midZ}
+			tInsert(newSegmentList, {init=seg.init, term=mid})
+			tInsert(newSegmentList, {init=mid, term=seg.term})
+			if mRandom() < branchProb then
+				local angle = mAtan2(vz, vx)
+				angle = AngleAdd(angle, (mRandom()*quarterPi)-eighthPi)
+				local bx, bz = CirclePos(seg.init.x, seg.init.z, dist*0.35, angle)
+				tInsert(newSegmentList, { init=seg.init, term={x=bx,y=seg.init.y,z=bz} })
+			end
 		end
+		segmentList = newSegmentList
 	end
-	if branchNum > 0 and #points > 3 then
-		for b = 1, branchNum do
-			local p = tRemove(points, mRandom(2, #points-1))
-			local bx2, bz2 = CirclePos(p.x, p.z, arcLength-p.i)
-			signArcLightning(p.x, p.z, bx2, bz2, heightDivisor, segLength, 0, p.i/arcLength, lightningCeg, flashCeg)
-			if #points < 4 then break end
-		end
+	for _, seg in pairs(segmentList) do
+		drawCegLine(seg.init.x, seg.init.y, seg.init.z, seg.term.x, seg.term.y, seg.term.z, lightningCeg)
 	end
 	spSpawnCEG(flashCeg,x1,y1,z1,0,1,0,2,0)
-	spSpawnCEG(flashCeg,x2,spGetGroundHeight(x2,z2),z2,0,1,0,2,0)
+	spSpawnCEG(flashCeg,x2,y2,z2,0,1,0,2,0)
 end
 
-local function arcLightningOverPoint(x, z, arcLength, heightDivisor, segLength, branchNum, start, lightningCeg, flashCeg)
+local function arcLightningOverPoint(x, z, arcLength, offsetMult, generationNum, branchProb, lightningCeg, flashCeg, minOffsetMultXZ, minOffsetMultY)
 	local angle1 = mRandom() * twicePi
 	local angle2 = AngleAdd(angle1, pi)
 	local radius = arcLength / 2
 	local x1, z1 = CirclePos(x, z, radius, angle1)
 	local x2, z2 = CirclePos(x, z, radius, angle2)
-	signArcLightning(x1, z1, x2, z2, heightDivisor, segLength, branchNum, start, lightningCeg, flashCeg)
+	signArcLightning(x1, z1, x2, z2, offsetMult, generationNum, branchProb, lightningCeg, flashCeg, minOffsetMultXZ, minOffsetMultY)
 end
 
 local function wormBigSign(w)
 	local minArc = mCeil(w.size.radius * 8)
 	local maxArc = mCeil(w.size.radius * 10)
 	local sx, sz = CirclePos(w.x, w.z, mRandom(minArc, maxArc))
-	signArcLightning( w.x, w.z, sx, sz, 2, 16, mRandom(1,3), 0, "WORMSIGN_LIGHTNING", "WORMSIGN_FLASH" )
+	signArcLightning( w.x, w.z, sx, sz, nil, nil, nil, "WORMSIGN_LIGHTNING", "WORMSIGN_FLASH" )
 	local snd = thunderSnds[mRandom(#thunderSnds)]
 	local y = spGetGroundHeight(w.x, w.z)
 	spPlaySoundFile(snd,0.75,w.x,y,w.z)
@@ -719,8 +691,7 @@ local function wormMediumSign(w)
 	local angle = mRandom() * twicePi
 	local sx1, sz1 = CirclePos(w.x, w.z, w.size.radius*0.5, angle)
 	local sx2, sz2 = CirclePos(w.x, w.z, w.size.diameter, angle)
-	-- signArcLightning( sx1, sz1, mRandom(minArc,maxArc), mRandom(1,3), 24 )
-	signArcLightning( sx1, sz1, sx2, sz2, mRandom(1,3), 16, mRandom(0,3) )
+	signArcLightning( sx1, sz1, sx2, sz2 )
 	local snd = lightningMediumSnds[mRandom(#lightningMediumSnds)]
 	spPlaySoundFile(snd,0.1,sx,sy,sz)
 end
@@ -737,8 +708,7 @@ local function wormLittleSign(w, sx, sz)
 		minArc = 24
 		maxArc = 96
 	end
-	-- signArcLightning( sx, sz, mRandom(minArc, maxArc), mRandom(2,5) )
-	arcLightningOverPoint( sx, sz, mRandom(minArc, maxArc), mRandom(2,5), 8, mRandom(0,2) )
+	arcLightningOverPoint( sx, sz, mRandom(minArc, maxArc) )
 	local snd = lightningLittleSnds[mRandom(#lightningLittleSnds)]
 	spPlaySoundFile(snd,0.1,sx,sy,sz)
 end

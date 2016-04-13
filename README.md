@@ -254,8 +254,7 @@ v6 -> v7
 - / remove ripple signs
 - / rename valid_node_func to neighbor_node_func
 - / distinguish between little and medium lightning with sounds
-- / branching lightning? and lightning arcing over underworm: http://gamedevelopment.tutsplus.com/tutorials/how-to-generate-shockingly-good-2d-lightning-effects--gamedev-2681
-- lightning is too linear. needs to curve around the Y axis randomly
+- / branching lightning? and lightning arcing over underworm
 - build helper requests isNotValid, sand restrict gadget provides on demand
 - update build pic
 - remove worm radar
