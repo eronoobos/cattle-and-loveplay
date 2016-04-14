@@ -22,13 +22,6 @@ local Sounds = {
       gainmod = 0.1,
       pitchmod = 0.1,
     },
-    WmLightning1 = {
-      file = "sounds/lightning1.ogg",
-      gain = 1.6,
-      gainmod = 0.1,
-      pitchmod = 0.15,
-      rolloff = 2,
-    },
     WmLightning2 = {
       file = "sounds/lightning2.ogg",
       gain = 2.0,
@@ -122,12 +115,6 @@ local Sounds = {
     WmCrunch1 = {
       file = "sounds/crunch1.ogg",
       gain = 1.0,
-      gainmod = 0.1,
-      pitchmod = 0.1,
-    },
-    WmExplode1 = {
-      file = "sounds/xplosml1.ogg",
-      gain = 1.4,
       gainmod = 0.1,
       pitchmod = 0.1,
     },

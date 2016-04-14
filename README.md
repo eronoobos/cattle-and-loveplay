@@ -259,7 +259,7 @@ v6 -> v7
 - / worm radar highlights w/ crosshair in minimap and edge arrows when new worm appears
 - / when one of your units is being eaten, crosshairs
 - update build pic
-- add nighttime dust and dirt ceg bitmaps
+- add nighttime dust and dirt ceg bitmaps (how?)
 - delete unecessary files
 - fix unitscript errors (check if piece is valid before exploding it?)
 - smooth transition from underworm to emerged if possible

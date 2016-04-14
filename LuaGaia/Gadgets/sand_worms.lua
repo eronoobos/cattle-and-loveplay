@@ -442,7 +442,7 @@ local function getWormSizes(sizesByUnitName)
 	local sizes = {}
 	for unitName, s in pairs(sizesByUnitName) do
 		local uDef = UnitDefNames[unitName]
-		local nodeSize = math.ceil(uDef.radius * 2.1)
+		local nodeSize = mMax( 128, mCeil(uDef.radius * 2.1) )
 		local wormGraph = getWormPathGraph(nodeSize)
 		local nodeDist = 1+ (2 * (nodeSize^2))
 		local neighbor_node_func = function ( node, neighbor ) 
