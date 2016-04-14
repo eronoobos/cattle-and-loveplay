@@ -225,7 +225,11 @@ local function Swallow(doomedByDist, edibleUnitIDs)
 			-- Spring.MoveCtrl.Disable(uID)
 			local uHealth, uMaxHealth = Spring.GetUnitHealth(uID)
 			if uHealth then
-				Spring.SetUnitHealth(uID, uHealth / 2)
+				Spring.MoveCtrl.Disable(uID)
+				Spring.AddUnitDamage(uID, uHealth/2, 0, unitID) -- just to register it's being attacked
+				Sleep(35)
+				Spring.MoveCtrl.Enable(uID)
+				-- Spring.SetUnitHealth(uID, uHealth / 2)
 				local pieces = piecesByID[uID]
 				if pieces and #pieces > 0 then
 					local piecesToEat = 1

@@ -256,9 +256,9 @@ v6 -> v7
 - / distinguish between little and medium lightning with sounds
 - / branching lightning? and lightning arcing over underworm
 - / build helper requests isNotValid, sand restrict gadget provides on demand
+- / worm radar highlights w/ crosshair in minimap and edge arrows when new worm appears
+- / when one of your units is being eaten, crosshairs
 - update build pic
-- remove worm radar
-- worm radar highlights w/ crosshair in minimap and edge arrows when new worm appears or when one of your units is being eaten. this can all be found out without passing info from gadget.
 - add nighttime dust and dirt ceg bitmaps
 - delete unecessary files
 - fix unitscript errors (check if piece is valid before exploding it?)
