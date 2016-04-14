@@ -172,6 +172,14 @@ function astar.clear_cached_neighbors ( nodes )
 	end
 end
 
+function astar.cache_neighbors( nodes, neighbor_node_func, valid_node_func )
+	if neighbor_node_func then is_neighbor_node = neighbor_node_func end
+	if valid_node_func then is_valid_node = valid_node_func end
+	for _, node in ipairs(nodes) do
+		local neighbors = neighbor_nodes(node, nodes)
+	end
+end
+
 function astar.distance ( x1, y1, x2, y2 )
 	return dist ( x1, y1, x2, y2 )
 end

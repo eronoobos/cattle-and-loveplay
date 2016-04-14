@@ -131,6 +131,7 @@ function widget:Initialize()
 	else
 		isNotValid = {}
 		widgetHandler:RegisterGlobal("passIsNotValid", passIsNotValid) --so that widget can receive isNotValid from sand_restrict gadget
+		Spring.SendLuaGaiaMsg('Sand Build Helper Widget Loaded')
 	end
 end 
 
@@ -186,4 +187,8 @@ end
 function widget:Shutdown()
 	gl.DeleteList(worldDisplayList)
 	gl.DeleteList(screenDisplayList)
+end
+
+function widget:GameStart()
+	
 end

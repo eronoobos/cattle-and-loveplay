@@ -546,6 +546,14 @@ function gadget:FeatureCreated(featureID, allyTeam)
 	end
 end
 
+function gadget:RecvLuaMsg(msg, playerID)
+	if msg == 'Sand Build Helper Widget Loaded' then
+		for uDefID, valid in pairs(isNotValid) do
+			SendToUnsynced("passIsNotValid", uDefID)
+		end
+	end
+end
+
 -- function gadget:UnitFinished(unitID, unitDefID, teamID)
 -- 	if restrictSand and sinkUnit[unitID] then
 --           sinkThisUnit(unitID, unitDefID)

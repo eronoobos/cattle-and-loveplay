@@ -312,19 +312,19 @@ local function getSandUnitValues()
 		elseif uDef.name == wormTriggerUnitName then
 			inedible[uDefID] = true
 		elseif uDef.showPlayerName then --string.find(string.lower(uDef.humanName), "commander") then
-			spEcho(uDef.name, uDef.humanName, "is commander")
+			-- spEcho(uDef.name, uDef.humanName, "is commander")
 			vals[uDefID] = commanderValue
 			if not wormEatCommander then
 				inedible[uDefID] = true
 			end
 		elseif uDef.extractsMetal > 0 then
-			spEcho(uDef.name, uDef.humanName, "is mex")
+			-- spEcho(uDef.name, uDef.humanName, "is mex")
 			vals[uDefID] = mexValue
 			if not wormEatMex then
 				inedible[uDefID] = true
 			end
 		elseif uDef.moveDef and uDef.moveDef.family == "hover" then
-			spEcho(uDef.name, uDef.humanName, "is hover")
+			-- spEcho(uDef.name, uDef.humanName, "is hover")
 			vals[uDefID] = hoverValue
 		else
 			local cost = mFloor( uDef.metalCost + (uDef.energyCost / 50) )
@@ -451,6 +451,7 @@ local function getWormSizes(sizesByUnitName)
 			end
 			return false
 		end
+		-- astar.cache_neighbors(wormGraph, neighbor_node_func)
 		local size = { radius = uDef.radius, diameter = uDef.radius * 2, maxMealSize = mCeil(uDef.radius * 0.888), unitName = unitName, badTargets = {}, wormGraph = wormGraph, neighbor_node_func = neighbor_node_func, nodeSize = nodeSize }
 		sizes[s] = size
 	end

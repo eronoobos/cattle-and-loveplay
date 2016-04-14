@@ -255,7 +255,7 @@ v6 -> v7
 - / rename valid_node_func to neighbor_node_func
 - / distinguish between little and medium lightning with sounds
 - / branching lightning? and lightning arcing over underworm
-- build helper requests isNotValid, sand restrict gadget provides on demand
+- / build helper requests isNotValid, sand restrict gadget provides on demand
 - update build pic
 - remove worm radar
 - worm radar highlights w/ crosshair in minimap and edge arrows when new worm appears or when one of your units is being eaten. this can all be found out without passing info from gadget.
@@ -263,5 +263,5 @@ v6 -> v7
 - delete unecessary files
 - fix unitscript errors (check if piece is valid before exploding it?)
 - smooth transition from underworm to emerged if possible
-- make lightning more efficient & less dumb looking by either using projectiles (beamlaser), or with opengl lines?
+- make lightning more efficient with opengl lines?
 - BAD IDEA?: rather than movectrl, wait until the worms lips are most of the way out of the sand, and then evaluate what is inside and eat it. use a four-lipped worm to form a cage from with units can't escape. the model must have lips halfway open, so that when the mouth is fully open, the colvols are at 45 degrees or so
