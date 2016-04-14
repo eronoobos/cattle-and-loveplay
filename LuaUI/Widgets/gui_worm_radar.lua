@@ -5,7 +5,7 @@ function widget:GetInfo()
 		author  = "zoggop",
 		date 	= "February 2012",
 		license	= "whatever",
-		layer 	= 0,
+		layer 	= -12,
 		enabled	= true
 	}
 end
@@ -104,7 +104,6 @@ local function seeUnit(unitID)
 	-- Spring.Echo(unitDefID, underwormDefID)
 	if unitDefID ~= underwormDefID then return end
 	if not seenWorms[unitID] then
-		Spring.Echo(unitID, "seen worm")
 		seenWorms[unitID] = Spring.GetGameSeconds()
 		local ux, uy, uz = Spring.GetUnitPosition(unitID)
 		table.insert(wormAlerts, {unitID = unitID, endSecond = Spring.GetGameSeconds()+alertDuration, x=ux, y=uy, z=uz})

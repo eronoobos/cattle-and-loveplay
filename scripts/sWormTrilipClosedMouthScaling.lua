@@ -211,7 +211,7 @@ local function Swallow(doomedByDist, edibleUnitIDs)
 		end
 	end
 	-- Spring.Echo(mostPieces)
-	local bites = math.random(math.min(mostPieces,3), 4)
+	local bites = math.random(math.min(mostPieces,2), 4)
 	for b = 1, bites do
 		Jaws(20, 900)
 		Spring.PlaySoundFile("WmRoar3",modelRadius/14,x,y,z)
@@ -225,11 +225,8 @@ local function Swallow(doomedByDist, edibleUnitIDs)
 			-- Spring.MoveCtrl.Disable(uID)
 			local uHealth, uMaxHealth = Spring.GetUnitHealth(uID)
 			if uHealth then
-				Spring.MoveCtrl.Disable(uID)
 				Spring.AddUnitDamage(uID, uHealth/2, 0, unitID) -- just to register it's being attacked
-				Sleep(35)
-				Spring.MoveCtrl.Enable(uID)
-				-- Spring.SetUnitHealth(uID, uHealth / 2)
+				Spring.SetUnitHealth(uID, uHealth / 2)
 				local pieces = piecesByID[uID]
 				if pieces and #pieces > 0 then
 					local piecesToEat = 1
