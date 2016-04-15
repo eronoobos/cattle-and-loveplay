@@ -6,7 +6,7 @@
 local mapinfo = {
 	name        = "Cattle and Loveplay",
 	shortname   = "CattleAndLoveplay",
-	description = "Dune. Desert map. By default, non-metal extracting buildings sink into sand, as do wrecks. Sand worms will eat your units on the sand. Many thanks to knorke, Google_Frog, SirArtturi, PicassoCT, FabriceFABS, and 8611. Some sound effects from http://www.freesfx.co.uk",
+	description = "Dune. Desert map. By default, non-metal extracting buildings sink into sand and worms will eat your units on the sand. Many thanks to knorke, Google_Frog, SirArtturi, PicassoCT, FabriceFABS, and 8611. Some sound effects from http://www.freesfx.co.uk",
 	author      = "eronoobos",
 	version     = "7",
 	--mutator   = "deployment";
@@ -215,8 +215,8 @@ local mapinfo = {
 			hardness = 1.0,
 			receiveTracks = false,
 			moveSpeeds = {
-				tank  = 1.25,
-				kbot  = 1.25,
+				tank  = 1.0,
+				kbot  = 1.0,
 				hover = 1.0,
 				ship  = 1.0,
 			},
@@ -226,8 +226,8 @@ local mapinfo = {
 			hardness = 1.0,
 			receiveTracks = false,
 			moveSpeeds = {
-				tank  = 1.25,
-				kbot  = 1.25,
+				tank  = 1.0,
+				kbot  = 1.0,
 				hover = 1.0,
 				ship  = 1.0,
 			},
