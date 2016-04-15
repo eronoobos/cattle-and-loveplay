@@ -94,7 +94,7 @@ local function getSandGraph(nodeSize)
 	return graph
 end
 
-local function DoLine2d(x1, y1, x2, y2)
+local function doLine2d(x1, y1, x2, y2)
     glVertex(x1, y1)
     glVertex(x2, y2)
 end
@@ -123,18 +123,18 @@ local function drawLandMarker(r, g, b, a, x1, y1, x2, y2, x3)
 		if n == 5 then
 			glLineWidth(6)
 			glColor(0, 0, 0, a)
-			glBeginEnd(GL_LINE_STRIP, DoLine2d, x2, y1, x2+2, y1)
+			glBeginEnd(GL_LINE_STRIP, doLine2d, x2, y1, x2+2, y1)
 		else
 			glLineWidth(2)
 			glColor(r, g, b, a)
 		end
 		if x3 then
-			glBeginEnd(GL_LINE_STRIP, DoLine2d, x1, y1, x3, y1)
-			glBeginEnd(GL_LINE_STRIP, DoLine2d, x3, y1, x3, y2)
-			glBeginEnd(GL_LINE_STRIP, DoLine2d, x3, y2, x2, y2)
+			glBeginEnd(GL_LINE_STRIP, doLine2d, x1, y1, x3, y1)
+			glBeginEnd(GL_LINE_STRIP, doLine2d, x3, y1, x3, y2)
+			glBeginEnd(GL_LINE_STRIP, doLine2d, x3, y2, x2, y2)
 		else
-			glBeginEnd(GL_LINE_STRIP, DoLine2d, x1, y1, x2, y1)
-			glBeginEnd(GL_LINE_STRIP, DoLine2d, x2, y1, x2, y2)
+			glBeginEnd(GL_LINE_STRIP, doLine2d, x1, y1, x2, y1)
+			glBeginEnd(GL_LINE_STRIP, doLine2d, x2, y1, x2, y2)
 		end
 		glRect(x2-n, y2-n, x2+n, y2+n)
 	end

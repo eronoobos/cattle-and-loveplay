@@ -56,12 +56,7 @@ function passIsNotValid(uDefID)
 --   spEcho(uDefID, 'received by widget')
 end
 
-local function DoLine(x1, y1, z1, x2, y2, z2)
-    glVertex(x1, y1, z1)
-    glVertex(x2, y2, z2)
-end
-
-local function DoTriangle(x1, y1, z1, x2, y2, z2, x3, y3, z3)
+local function doTriangle(x1, y1, z1, x2, y2, z2, x3, y3, z3)
 	glVertex(x1, y1, z1)
     glVertex(x2, y2, z2)
     glVertex(x3, y3, z3)
@@ -110,8 +105,8 @@ local function DrawBuildWarning()
 	glColor(1, 0, 0, 1)
 	for i = 1, #myBadFeet do
 		local foot = myBadFeet[i]
-		glBeginEnd(GL_TRIANGLE_STRIP, DoTriangle, foot.x, y, foot.z, foot.x+16, y, foot.z, foot.x+16, y, foot.z+16)
-		glBeginEnd(GL_TRIANGLE_STRIP, DoTriangle, foot.x, y, foot.z, foot.x, y, foot.z+16, foot.x+16, y, foot.z+16)
+		glBeginEnd(GL_TRIANGLE_STRIP, doTriangle, foot.x, y, foot.z, foot.x+16, y, foot.z, foot.x+16, y, foot.z+16)
+		glBeginEnd(GL_TRIANGLE_STRIP, doTriangle, foot.x, y, foot.z, foot.x, y, foot.z+16, foot.x+16, y, foot.z+16)
 	end
 	glColor(1, 1, 1, 0.5)
 
@@ -139,11 +134,6 @@ local function CameraStatesMatch(stateA, stateB)
 	end
 	return true
 end
-
--- function widget:IsAbove(x, y)
-	-- because otherwise widget:MouseMove never gets called?
-	-- return true
--- end
 
 function widget:Initialize()
 	myFont = glLoadFont('LuaUI/Fonts/Orbitron Bold.ttf', 36, 4, 10)

@@ -97,7 +97,6 @@ local mMin = math.min
 local mCeil = math.ceil
 local mFloor = math.floor
 local mSqrt = math.sqrt
-local tInsert = table.insert
 local tRemove = table.remove
 
 -- localized Spring functions
@@ -141,6 +140,10 @@ local spSetUnitCloak = Spring.SetUnitCloak
 local spGetUnitsInSphere = Spring.GetUnitsInSphere
 local spGetSpectatingState = Spring.GetSpectatingState
 local spGiveOrderToUnit = Spring.GiveOrderToUnit
+local spSetUnitMaxHealth = Spring.SetUnitMaxHealth
+local spSetUnitNoDraw = Spring.SetUnitNoDraw
+local spSetUnitNoMinimap = Spring.SetUnitNoMinimap
+local spSetUnitNoSelect = Spring.SetUnitNoSelect
 
 -- localizations that must be set in Initialize
 local spMoveCtrlEnable
@@ -158,20 +161,16 @@ local function randomXYZ()
 	return mRandom(sizeX), 0, mRandom(sizeZ)
 end
 
-local function normalizeVector(...)
-	local dist = 0
-	local arg = {...}
-	for _, a in pairs(arg) do
-		dist = dist + (a^2)
-	end
-	dist = mSqrt(dist)
-	if dist == 0 then return ..., 0 end
-	local v = {}
-	for _, a in pairs(arg) do
-		tInsert(v, a/dist)
-	end
-	tInsert(v, dist)
-	return unpack(v)
+local function normalizeVector2d(vx, vy)
+	if vx == 0 and vy == 0 then return 0, 0 end
+	local dist = mSqrt(vx*vx + vy*vy)
+	return vx/dist, vy/dist, dist
+end
+
+local function normalizeVector3d(vx, vy, vz)
+	if vx == 0 and vy == 0 and vz == 0 then return 0, 0, 0 end
+	local dist = mSqrt(vx*vx + vy*vy + vz*vz)
+	return vx/dist, vy/dist, vz/dist, dist
 end
 
 local function perpendicularVector2d(vx, vz)
@@ -206,7 +205,8 @@ end
 
 function meanAngle (angleList)
 	local sumSin, sumCos = 0, 0
-	for i, angle in pairs(angleList) do
+	for i = 1, #angleList do
+		local angle = angleList[i]
 		sumSin = sumSin + mSin(angle)
 		sumCos = sumCos + mCos(angle)
 	end
@@ -228,7 +228,7 @@ end
 
 local function loadWormReDir()
 	if not VFS.FileExists('data/sand_worm_redirect_size.lua') or not VFS.FileExists('data/sand_worm_redirect_matrix.u8') then
-		Spring.Echo("Could not load worm redirect matrix. Will use a different method to find nearest sand positions.")
+		spEcho("Could not load worm redirect matrix. Will use a different method to find nearest sand positions.")
 		return
 	end
 	local reDirSize = VFS.Include('data/sand_worm_redirect_size.lua')
@@ -269,8 +269,8 @@ local function getWormPathGraph(nodeSize)
 			end
 			if sand then
 				local node = { x = x, y = z, id = id}
+				graph[id] = node
 				id = id + 1
-				tInsert(graph, node)
 				-- spMarkerAddPoint(x, 100, z, nodeSize)
 			end
 		end
@@ -335,11 +335,13 @@ local function getSandUnitValues()
 end
 
 local function mapClampX(x)
-	return mMax(mMin(x, sizeX), 0)
+	if x > sizeX then x = sizeX elseif x < 0 then x = 0 end
+	return x
 end
 
 local function mapClampZ(z)
-	return mMax(mMin(z, sizeZ), 0)
+	if z > sizeZ then z = sizeZ elseif z < 0 then z = 0 end
+	return z
 end
 
 local function mapClampXZ(x, z)
@@ -370,7 +372,7 @@ local function nearestSand(x, z)
 			end
 		end
 	end
-	Spring.Echo("no wormReDir, using astar.nearest_node")
+	spEcho("no wormReDir, using astar.nearest_node")
 	local node = astar.nearest_node(x, z, wormSizes[4].wormGraph)
 	return node.x, node.y
 end
@@ -457,7 +459,8 @@ end
 
 local function occupyBox(uSize, ux, uz, dx, dz)
 	local insideBox = false
-	for ib, box in pairs(occupiedBoxes) do
+	for ib = 1, #occupiedBoxes do
+		local box = occupiedBoxes[ib]
 		if ux > box.xmin and ux < box.xmax and uz > box.zmin and uz < box.zmax then
 			box.count = box.count + 1
 			if uSize > box.largestUnitSize then box.largestUnitSize = uSize end
@@ -480,7 +483,7 @@ local function occupyBox(uSize, ux, uz, dx, dz)
 			dxSum = dx,
 			dzSum = dz,
 		}
-		tInsert(occupiedBoxes, box)
+		occupiedBoxes[#occupiedBoxes+1] = box
 	end
 end
 
@@ -527,7 +530,8 @@ local function wormTargetting()
 		if w then
 			local y = spGetGroundHeight(w.x, w.z)
 			local nearUnits = spGetUnitsInSphere(w.x, y, w.z, w.range*3)
-			for _, nuID in pairs(nearUnits) do
+			for i = 1, #nearUnits do
+				local nuID = nearUnits[i]
 				excludeUnits[nuID] = wID
 			end
 		end
@@ -617,7 +621,7 @@ end
 local function drawCegLine(x1, y1, z1, x2, y2, z2, ceg, spacing)
 	spacing = spacing or 1
 	ceg = ceg or "WORMSIGN_LIGHTNING_SMALL"
-	local vx, vy, vz, dist = normalizeVector(x2-x1, y2-y1, z2-z1)
+	local vx, vy, vz, dist = normalizeVector3d(x2-x1, y2-y1, z2-z1)
 	for i = 0, dist, spacing do
 		spSpawnCEG(ceg, x1+i*vx, y1+i*vy, z1+i*vz, 0, 1, 0, 2, 0)
 	end
@@ -640,25 +644,26 @@ local function signArcLightning(x1, z1, x2, z2, offsetMult, generationNum, branc
 			local midX = (seg.init.x + seg.term.x) / 2
 			local midY = (seg.init.y + seg.term.y) / 2
 			local midZ = (seg.init.z + seg.term.z) / 2
-			local vx, vz, dist = normalizeVector(seg.term.x-seg.init.x, seg.term.z-seg.init.z)
+			local vx, vz, dist = normalizeVector2d(seg.term.x-seg.init.x, seg.term.z-seg.init.z)
 			local pvx, pvz = perpendicularVector2d(vx, vz)
 			local offMax = dist * offsetMult
 			local offsetXZ = mRandom(dist*minOffsetMultXZ, dist*offsetMult)
 			midX, midZ = midX+(pvx*offsetXZ), midZ+(pvz*offsetXZ)
 			midY = mMax( spGetGroundHeight(midX,midZ), midY+mRandom(dist*minOffsetMultY,offMax) )
 			local mid = {x=midX, y=midY, z=midZ}
-			tInsert(newSegmentList, {init=seg.init, term=mid})
-			tInsert(newSegmentList, {init=mid, term=seg.term})
+			newSegmentList[#newSegmentList+1] = {init=seg.init, term=mid}
+			newSegmentList[#newSegmentList+1] = {init=mid, term=seg.term}
 			if mRandom() < branchProb then
 				local angle = mAtan2(vz, vx)
 				angle = AngleAdd(angle, (mRandom()*quarterPi)-eighthPi)
 				local bx, bz = CirclePos(seg.init.x, seg.init.z, dist*0.35, angle)
-				tInsert(newSegmentList, { init=seg.init, term={x=bx,y=seg.init.y,z=bz} })
+				newSegmentList[#newSegmentList+1] = { init=seg.init, term={x=bx,y=seg.init.y,z=bz} }
 			end
 		end
 		segmentList = newSegmentList
 	end
-	for _, seg in pairs(segmentList) do
+	for i = 1, #segmentList do
+		local seg = segmentList[i]
 		drawCegLine(seg.init.x, seg.init.y, seg.init.z, seg.term.x, seg.term.y, seg.term.z, lightningCeg)
 	end
 	spSpawnCEG(flashCeg,x1,y1,z1,0,1,0,2,0)
@@ -780,7 +785,7 @@ local function wormDirect(w)
 	end
 	local distx = tx - x
 	local distz = tz - z
-	w.vx, w.vz = normalizeVector(distx, distz)
+	w.vx, w.vz = normalizeVector2d(distx, distz)
 end
 
 local function wormSpawn(x, z)
@@ -797,7 +802,8 @@ local function wormSpawn(x, z)
 		elseif #occupiedBoxes > 0 then
 			local highestDist = 0
 			local highestBox
-			for _, b in pairs(occupiedBoxes) do
+			for ib = 1, #occupiedBoxes do
+				local b = occupiedBoxes[ib]
 				local lowestDist
 				for _, w in pairs(worm) do
 					local dist = DistanceSq(b.x, b.z, w.x, w.z)
@@ -844,7 +850,7 @@ local function wormSpawn(x, z)
 			underUnitID = spCreateUnit(wormUnderUnitName, spawnX, spGetGroundHeight(spawnX, spawnZ), spawnZ, 0, gaiaTeam),
 		}
 		-- spSetUnitRadiusAndHeight(w.underUnitID, mCeil(w.size.radius*0.8), mCeil(w.size.radius*0.1))
-		Spring.SetUnitMaxHealth(w.underUnitID, uDef.health)
+		spSetUnitMaxHealth(w.underUnitID, uDef.health)
 		spMoveCtrlEnable(w.underUnitID)
 		-- spSetUnitCollisionVolumeData( w.underUnitID,
 		-- 	w.size.diameter, w.size.radius, w.size.diameter,
@@ -908,10 +914,10 @@ local function wormAttack(targetID, wID)
 	local attackerID = spCreateUnit(w.size.unitName, x, y, z, 0, gaiaTeam, false)
 	if w.underUnitID then
 		-- hide underworm
-		Spring.SetUnitNoDraw(w.underUnitID, true)
-		Spring.SetUnitNoMinimap(w.underUnitID, true)
-		Spring.SetUnitNoSelect(w.underUnitID, true)
-		-- Spring.Echo(w.underUnitID, "hidden")
+		spSetUnitNoDraw(w.underUnitID, true)
+		spSetUnitNoMinimap(w.underUnitID, true)
+		spSetUnitNoSelect(w.underUnitID, true)
+		-- spEcho(w.underUnitID, "hidden")
 	end
 	isEmergedWorm[attackerID] = wID
 	w.emergedID = attackerID
@@ -1012,7 +1018,8 @@ local function doWormAttacks(gf, second)
 			local unitsNearWorm = spGetUnitsInSphere(wx, wy, wz, w.range)
 			local bestVal = -99999
 			local bestID
-			for k, uID in pairs(unitsNearWorm) do
+			for k = 1, #unitsNearWorm do
+				local uID = unitsNearWorm[k]
 				local uDefID = spGetUnitDefID(uID)
 				local uDef = UnitDefs[uDefID]
 				if wormEmergeUnitNames[uDef.name] then
@@ -1079,7 +1086,8 @@ function gadget:Initialize()
 	nextPotentialEvent = spGetGameSeconds() + wormEventFrequency
 	-- clear leftover worm units
 	local units = spGetTeamUnits(gaiaTeam)
-	for _, uID in pairs(units) do
+	for i = 1, #units do
+		local uID = units[i]
 		local uDefID = spGetUnitDefID(uID)
 		local uDef = UnitDefs[uDefID]
 		if uDef.name == wormUnderUnitName or wormEmergeUnitNames[uDef.name] then
@@ -1170,10 +1178,10 @@ function gadget:UnitDestroyed(unitID, unitDefID, teamID, attackerID, attackerDef
 				w.tx, w.tz = nil, nil
 				w.endSecond = spGetGameSeconds() + baseWormDuration
 				if w.underUnitID then
-					Spring.SetUnitNoDraw(w.underUnitID, false)
-					Spring.SetUnitNoMinimap(w.underUnitID, false)
-					Spring.SetUnitNoSelect(w.underUnitID, false)
-					-- Spring.Echo(w.underUnitID, "revealed")
+					spSetUnitNoDraw(w.underUnitID, false)
+					spSetUnitNoMinimap(w.underUnitID, false)
+					spSetUnitNoSelect(w.underUnitID, false)
+					-- spEcho(w.underUnitID, "revealed")
 					spSetUnitHealth(w.underUnitID, spGetUnitHealth(unitID))
 				end
 				wormDirect(w)

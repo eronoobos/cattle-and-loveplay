@@ -84,15 +84,15 @@ local GL_TRIANGLE_STRIP = GL.TRIANGLE_STRIP
 local function normalizeVector2d(vx, vy)
 	if vx == 0 and vy == 0 then return 0, 0 end
 	local dist = mSqrt(vx*vx + vy*vy)
-	return vx/dist, vy/dist
+	return vx/dist, vy/dist, dist
 end
 
-local function DoLine2D(x1, y1, x2, y2)
+local function doLine2d(x1, y1, x2, y2)
     glVertex(x1, y1)
     glVertex(x2, y2)
 end
 
-local function DoTriangle2D(x1, y1, x2, y2, x3, y3)
+local function doTriangle2d(x1, y1, x2, y2, x3, y3)
     glVertex(x1, y1)
     glVertex(x2, y2)
     glVertex(x3, y3)
@@ -101,13 +101,13 @@ end
 local function drawArrow(x, y, viewX, viewY)
 	local centerX, centerY = viewX/2, viewY/2
 	local dx, dy = x-centerX, y-centerY
-	local vx, vy, dist = normalizeVector2d(dx, dy)
+	local vx, vy = normalizeVector2d(dx, dy)
 	if x > viewX then x1 = viewX elseif x < 0 then x1 = 0 else x1 = x end
 	if y > viewY then y1 = viewY elseif y < 0 then y1 = 0 else y1 = y end
 	local backX, backY = x1-(vx*arrowSize), y1-(vy*arrowSize)
 	local x2, y2 = backX+(vy*arrowSizeHalf), backY-(vx*arrowSizeHalf)
 	local x3, y3 = backX-(vy*arrowSizeHalf), backY+(vx*arrowSizeHalf)
-	glBeginEnd(GL_TRIANGLE_STRIP, DoTriangle2D, x1, y1, x2, y2, x3, y3)
+	glBeginEnd(GL_TRIANGLE_STRIP, doTriangle2d, x1, y1, x2, y2, x3, y3)
 	local cx = (x1 + x2 + x3) / 3
 	local cy = (y1 + y2 + y3) / 3
 	return cx-arrowIconSizeHalf, cy-arrowIconSizeHalf, cx+arrowIconSizeHalf, cy+arrowIconSizeHalf
@@ -263,10 +263,10 @@ function widget:DrawInMiniMap(sx, sz)
 		local gapY = targetGap * sz
 		glColor(ac.r, ac.g, ac.b, ac.a)
 		glLineWidth(2)
-		glBeginEnd(GL_LINE_STRIP, DoLine2D, 0, y, x-gapX, y)
-		glBeginEnd(GL_LINE_STRIP, DoLine2D, x+gapX, y, sx, y)
-		glBeginEnd(GL_LINE_STRIP, DoLine2D, x, 0, x, y-gapY)
-		glBeginEnd(GL_LINE_STRIP, DoLine2D, x, y+gapY, x, sz)
+		glBeginEnd(GL_LINE_STRIP, doLine2d, 0, y, x-gapX, y)
+		glBeginEnd(GL_LINE_STRIP, doLine2d, x+gapX, y, sx, y)
+		glBeginEnd(GL_LINE_STRIP, doLine2d, x, 0, x, y-gapY)
+		glBeginEnd(GL_LINE_STRIP, doLine2d, x, y+gapY, x, sz)
 		glColor(1, 1, 1, 0.5)
 	end
 end
