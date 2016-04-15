@@ -13,7 +13,7 @@ end
 -- config
 local areWorms = true
 local alertDuration = 5 -- how long in seconds each sign lasts on screen
-local flashDuration = 5 -- frames per flash
+local flashDuration = 0.33 -- seconds per flash
 
 local wormConfig = VFS.Include('wormconfig/wormconfig.lua')
 local wormEmergeUnitNames = wormConfig.wormEmergeUnitNames
@@ -29,9 +29,9 @@ local arrowDiagTex = "luaui/images/sworm_arrow_diag.png"
 local arrowSize = 64
 local arrowIconSize = 48
 local targetGap = 0.05
-local timeBetweenAttacks = 60 -- in seconds
+local secondsBetweenAttackAlerts = 60
 
-local sizeX = Game.mapSizeX 
+local sizeX = Game.mapSizeX
 local sizeZ = Game.mapSizeZ
 
 -- storage
@@ -47,66 +47,81 @@ local alertColors = {
 }
 local arrowSizeHalf = arrowSize / 2
 local arrowIconSizeHalf = arrowIconSize / 2
-local nextFlash = 0
-local nextAttackAlert = 0
+local lastFlash
+local lastAttackAlert
 
 local mSqrt = math.sqrt
-local tInsert = table.insert
 
-local Spring.
+local tInsert = table.insert
+local tRemove = table.remove
+
+local spIsSphereInView = Spring.IsSphereInView
+local spIsUnitInView = Spring.IsUnitInView
+local spGetUnitDefID = Spring.GetUnitDefID
+local spGetUnitPosition = Spring.GetUnitPosition
+local spGetMapOptions = Spring.GetMapOptions
+local spGetViewGeometry = Spring.GetViewGeometry
+local spGetUnitsInSphere = Spring.GetUnitsInSphere
+local spAddUnitIcon = Spring.AddUnitIcon
+local spSetUnitDefIcon = Spring.SetUnitDefIcon
+local spWorldToScreenCoords = Spring.WorldToScreenCoords
+local spEcho = Spring.Echo
+local spGetTimer = Spring.GetTimer
+local spDiffTimers = Spring.DiffTimers
+
+local glTexture = gl.Texture
+local glColor = gl.Color
+local glLineWidth = gl.LineWidth
+local glBeginEnd = gl.BeginEnd
+local glVertex = gl.Vertex
+local glTexRect = gl.TexRect
+
+local GL_LINE_STRIP = GL.LINE_STRIP
+local GL_TRIANGLE_STRIP = GL.TRIANGLE_STRIP
 
 -- local functions
 
-local function normalizeVector(...)
-	local dist = 0
-	local arg = {...}
-	for _, a in pairs(arg) do
-		dist = dist + (a^2)
-	end
-	dist = mSqrt(dist)
-	if dist == 0 then return ..., 0 end
-	local v = {}
-	for _, a in pairs(arg) do
-		tInsert(v, a/dist)
-	end
-	tInsert(v, dist)
-	return unpack(v)
+local function normalizeVector2d(vx, vy)
+	if vx == 0 and vy == 0 then return 0, 0 end
+	local dist = mSqrt(vx*vx + vy*vy)
+	return vx/dist, vy/dist
 end
 
 local function DoLine2D(x1, y1, x2, y2)
-    gl.Vertex(x1, y1)
-    gl.Vertex(x2, y2)
+    glVertex(x1, y1)
+    glVertex(x2, y2)
 end
 
 local function DoTriangle2D(x1, y1, x2, y2, x3, y3)
-    gl.Vertex(x1, y1)
-    gl.Vertex(x2, y2)
-    gl.Vertex(x3, y3)
+    glVertex(x1, y1)
+    glVertex(x2, y2)
+    glVertex(x3, y3)
 end
 
 local function drawArrow(x, y, viewX, viewY)
 	local centerX, centerY = viewX/2, viewY/2
 	local dx, dy = x-centerX, y-centerY
-	local vx, vy, dist = normalizeVector(dx, dy)
-	local x1 = math.min( math.max(x, 0), viewX )
-	local y1 = math.min( math.max(y, 0), viewY )
+	local vx, vy, dist = normalizeVector2d(dx, dy)
+	if x > viewX then x1 = viewX elseif x < 0 then x1 = 0 else x1 = x end
+	if y > viewY then y1 = viewY elseif y < 0 then y1 = 0 else y1 = y end
 	local backX, backY = x1-(vx*arrowSize), y1-(vy*arrowSize)
 	local x2, y2 = backX+(vy*arrowSizeHalf), backY-(vx*arrowSizeHalf)
 	local x3, y3 = backX-(vy*arrowSizeHalf), backY+(vx*arrowSizeHalf)
-	gl.BeginEnd(GL.TRIANGLE_STRIP, DoTriangle2D, x1, y1, x2, y2, x3, y3)
+	glBeginEnd(GL_TRIANGLE_STRIP, DoTriangle2D, x1, y1, x2, y2, x3, y3)
 	local cx = (x1 + x2 + x3) / 3
 	local cy = (y1 + y2 + y3) / 3
 	return cx-arrowIconSizeHalf, cy-arrowIconSizeHalf, cx+arrowIconSizeHalf, cy+arrowIconSizeHalf
 end
 
 local function seeUnit(unitID)
-	local unitDefID = Spring.GetUnitDefID(unitID)
-	-- Spring.Echo(unitDefID, underwormDefID)
+	local unitDefID = spGetUnitDefID(unitID)
+	-- spEcho(unitDefID, underwormDefID)
 	if unitDefID ~= underwormDefID then return end
+	local cur = spGetTimer()
 	if not seenWorms[unitID] then
-		seenWorms[unitID] = Spring.GetGameSeconds()
-		local ux, uy, uz = Spring.GetUnitPosition(unitID)
-		table.insert(wormAlerts, {unitID = unitID, endSecond = Spring.GetGameSeconds()+alertDuration, x=ux, y=uy, z=uz})
+		seenWorms[unitID] = cur
+		local ux, uy, uz = spGetUnitPosition(unitID)
+		wormAlerts[#wormAlerts+1] = {unitID = unitID, timer = cur, x=ux, y=uy, z=uz}
 	end
 end
 
@@ -114,27 +129,30 @@ end
 -- callins
 
 function widget:Initialize()
-	local mapOptions = Spring.GetMapOptions()
+	local mapOptions = spGetMapOptions()
 	if mapOptions then
-		if Spring.GetMapOptions().sand_worms == "0" then
+		if spGetMapOptions().sand_worms == "0" then
 			areWorms = false
 		end
 	end
 	if not areWorms then
-		Spring.Echo("Sand worms are not enabled. Sand Worm Radar widget has been disabled.")
+		spEcho("Sand worms are not enabled. Sand Worm Radar widget has been disabled.")
 		widgetHandler:RemoveWidget()
 	else
-		Spring.AddUnitIcon('sworm', 'icons/sworm.png', 1.25, 1.0, true)
-		Spring.AddUnitIcon('underworm', 'icons/underworm.png', 2.5, 1.0, false)
-		Spring.SetUnitDefIcon(UnitDefNames.sworm1.id, 'sworm')
-		Spring.SetUnitDefIcon(UnitDefNames.sworm2.id, 'sworm')
-		Spring.SetUnitDefIcon(UnitDefNames.sworm3.id, 'sworm')
-		Spring.SetUnitDefIcon(UnitDefNames.sworm4.id, 'sworm')
-		Spring.SetUnitDefIcon(UnitDefNames.underworm.id, 'underworm')
+		spAddUnitIcon('sworm', 'icons/sworm.png', 1.25, 1.0, true)
+		spAddUnitIcon('underworm', 'icons/underworm.png', 2.5, 1.0, false)
+		spSetUnitDefIcon(UnitDefNames.sworm1.id, 'sworm')
+		spSetUnitDefIcon(UnitDefNames.sworm2.id, 'sworm')
+		spSetUnitDefIcon(UnitDefNames.sworm3.id, 'sworm')
+		spSetUnitDefIcon(UnitDefNames.sworm4.id, 'sworm')
+		spSetUnitDefIcon(UnitDefNames.underworm.id, 'underworm')
 	end
 	for name, _ in pairs(wormEmergeUnitNames) do
 		wormEmergeUnitDefIDs[UnitDefNames[name].id] = true
 	end
+	local cur = spGetTimer()
+	lastFlash = cur
+	lastAttackAlert = cur
 end
 
 function widget:UnitEnteredRadar(unitID, unitTeam, allyTeam, unitDefID)
@@ -146,15 +164,18 @@ function widget:UnitEnteredLos(unitID, unitTeam, allyTeam, unitDefID)
 end
 
 function widget:UnitDamaged(unitID, unitDefID, unitTeam, damage, paralyzer, weaponDefID, projectileID, attackerID, attackerDefID, attackerTeam)
-	local second = Spring.GetGameSeconds()
-	if second > nextAttackAlert then
-		local ux, uy, uz = Spring.GetUnitPosition(unitID)
-		local nearUnits = Spring.GetUnitsInSphere(ux, uy, uz, 150)
-		for _, uID in pairs(nearUnits) do
-			local unitDefID = Spring.GetUnitDefID(uID)
+	local cur = spGetTimer()
+	local attackAlertAge = spDiffTimers(cur, lastAttackAlert)
+	if attackAlertAge > secondsBetweenAttackAlerts then
+		local ux, uy, uz = spGetUnitPosition(unitID)
+		local nearUnits = spGetUnitsInSphere(ux, uy, uz, 150)
+		if not nearUnits or #nearUnits == 0 then return end
+		for i = 1, #nearUnits do
+			local uID = nearUnits[i]
+			local unitDefID = spGetUnitDefID(uID)
 			if wormEmergeUnitDefIDs[unitDefID] then
-				table.insert(wormAlerts, {endSecond = second+alertDuration, attack = true, x=ux, y=uy, z=uz})
-				nextAttackAlert = second + timeBetweenAttacks
+				wormAlerts[#wormAlerts+1] = {timer = cur, attack = true, x=ux, y=uy, z=uz}
+				lastAttackAlert = cur
 				break
 			end
 		end
@@ -162,64 +183,77 @@ function widget:UnitDamaged(unitID, unitDefID, unitTeam, damage, paralyzer, weap
 end
 
 function widget:GameFrame(frame)
+	if #wormAlerts == 0 then return end
+	for i = #wormAlerts, 1, -1 do
+		local alert = wormAlerts[i]
+		if alert.unitID then
+			alert.x, alert.y, alert.z = spGetUnitPosition(alert.unitID)
+			if not alert.x then
+				tRemove(wormAlerts, i)
+			end
+		end
+	end
+end
+
+function widget:Update(dt)
 	if #seenWorms == 0 and #wormAlerts == 0 then return end
-	local second = Spring.GetGameSeconds()
+	local cur = spGetTimer()
 	for unitID, seen in pairs(seenWorms) do
-		if second > seen + 300 then
+		local age = spDiffTimers(cur, seen)
+		if age > 300 then
 			seenWorms[unitID] = nil
 		end
 	end
 	for i = #wormAlerts, 1, -1 do
 		local alert = wormAlerts[i]
-		if second > alert.endSecond then
-			table.remove(wormAlerts, i)
-		elseif alert.unitID then
-			alert.x, alert.y, alert.z = Spring.GetUnitPosition(alert.unitID)
-			if not alert.x then
-				table.remove(wormAlerts, i)
-			end
+		local age = spDiffTimers(cur, alert.timer)
+		if age > alertDuration then
+			tRemove(wormAlerts, i)
 		end
 	end
-	if frame >= nextFlash then
+	local flashAge = spDiffTimers(cur, lastFlash)
+	if flashAge > flashDuration then
 		alertColor = alertColor + 1
 		if alertColor > 4 then alertColor = 1 end
-		nextFlash = frame + flashDuration
+		lastFlash = cur
 	end
 end
 
 function widget:DrawScreen()
 	if #wormAlerts == 0 then return end
-	local viewX, viewY, posX, posY = Spring.GetViewGeometry()
+	local viewX, viewY, posX, posY = spGetViewGeometry()
 	local ac = alertColors[alertColor]
-	for _, alert in pairs(wormAlerts) do
+	for i = 1, #wormAlerts do
+		local alert = wormAlerts[i]
 		local visible
-		if alert.unitID and Spring.IsUnitInView(alert.unitID) then
+		if alert.unitID and spIsUnitInView(alert.unitID) then
 			visible = true 
-		elseif Spring.IsSphereInView(alert.x, alert.y, alert.z, 50) then
+		elseif spIsSphereInView(alert.x, alert.y, alert.z, 50) then
 			visible = true
 		end
 		if not visible then
 			-- draw arrow at edge of screen if the worm is out of the viewport
 			local ux, uy, uz = alert.x, alert.y, alert.z
-			local x, y = Spring.WorldToScreenCoords(ux, uy, uz)
-			gl.Color(ac.r, ac.g, ac.b, ac.a)
+			local x, y = spWorldToScreenCoords(ux, uy, uz)
+			glColor(ac.r, ac.g, ac.b, ac.a)
 			local x1, y1, x2, y2 = drawArrow(x, y, viewX, viewY)
-			gl.Color(1, 1, 1, ac.a)
+			glColor(1, 1, 1, ac.a)
 			if alert.attack then
-				gl.Texture(attackTex)
+				glTexture(attackTex)
 			else
-				gl.Texture(signTex)
+				glTexture(signTex)
 			end
-			gl.TexRect(x1, y1, x2, y2)
+			glTexRect(x1, y1, x2, y2)
 		end
 	end
-	gl.Color(1, 1, 1, 0.5)
+	glColor(1, 1, 1, 0.5)
 end
 
 function widget:DrawInMiniMap(sx, sz)
 	if #wormAlerts == 0 then return end
 	local ac = alertColors[alertColor]
-	for _, alert in pairs(wormAlerts) do
+	for i = 1, #wormAlerts do
+		local alert = wormAlerts[i]
 		local ux, uy, uz = alert.x, alert.y, alert.z
 		local xr = ux/sizeX
 		local yr = 1 - uz/sizeZ
@@ -227,12 +261,12 @@ function widget:DrawInMiniMap(sx, sz)
 		local y = yr*sz
 		local gapX = targetGap * sx
 		local gapY = targetGap * sz
-		gl.Color(ac.r, ac.g, ac.b, ac.a)
-		gl.LineWidth(2)
-		gl.BeginEnd(GL.LINE_STRIP, DoLine2D, 0, y, x-gapX, y)
-		gl.BeginEnd(GL.LINE_STRIP, DoLine2D, x+gapX, y, sx, y)
-		gl.BeginEnd(GL.LINE_STRIP, DoLine2D, x, 0, x, y-gapY)
-		gl.BeginEnd(GL.LINE_STRIP, DoLine2D, x, y+gapY, x, sz)
-		gl.Color(1, 1, 1, 0.5)
+		glColor(ac.r, ac.g, ac.b, ac.a)
+		glLineWidth(2)
+		glBeginEnd(GL_LINE_STRIP, DoLine2D, 0, y, x-gapX, y)
+		glBeginEnd(GL_LINE_STRIP, DoLine2D, x+gapX, y, sx, y)
+		glBeginEnd(GL_LINE_STRIP, DoLine2D, x, 0, x, y-gapY)
+		glBeginEnd(GL_LINE_STRIP, DoLine2D, x, y+gapY, x, sz)
+		glColor(1, 1, 1, 0.5)
 	end
 end
