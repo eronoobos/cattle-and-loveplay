@@ -149,17 +149,15 @@ local function drawStartPosCaution(scrX,scrY)
 end
 
 local function drawAlerts(viewX, viewY, sx, sy, alertX, alertSlide, alertOpacity)
-	-- glColor(1, 0.9, 0.5, 1)
 	glColor(1, 1, 1, 1)
 	myFont:Begin()
-	myFont:SetTextColor(alertR, alertG, alertB, 1.0)
+	myFont:SetTextColor(alertR, alertG, alertB, alertOpacity)
 	myFont:Print(sandTitle, alertX, viewY*0.4, 36, "rvo")
 	myFont:End()
 	myBodyFont:Begin()
-	myBodyFont:SetTextColor(alertR, alertG, alertB, 1.0)
+	myBodyFont:SetTextColor(alertR, alertG, alertB, alertOpacity)
 	myBodyFont:Print(sandWarning, alertX, viewY*0.36, 16, "rvo")
 	myBodyFont:End()
-	-- myBodyFont:Print(sandWarning, alertX, viewY*0.36, 16, "rv")
 	if sx then
 		if sx > viewX*0.65 then
 			drawLandMarker(alertR, alertG, alertB, alertOpacity, viewX*0.61*alertSlide, viewY*0.4, sx, sy)
