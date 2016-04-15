@@ -144,6 +144,7 @@ local spSetUnitMaxHealth = Spring.SetUnitMaxHealth
 local spSetUnitNoDraw = Spring.SetUnitNoDraw
 local spSetUnitNoMinimap = Spring.SetUnitNoMinimap
 local spSetUnitNoSelect = Spring.SetUnitNoSelect
+local spGetUnitSeparation = Spring.GetUnitSeparation
 
 -- localizations that must be set in Initialize
 local spMoveCtrlEnable
@@ -538,6 +539,8 @@ local function wormTargetting()
 	end
 	for wID, w in pairs(worm) do
 		w.bestDist = nil
+		w.targetUnitID = nil
+		w.targetUnitData = nil
 	end
 	totalMovement = 0
 	sandUnits = {}
@@ -961,9 +964,22 @@ local function doWormMovementAndEffects(gf, second)
 
 			end
 		end
-		local quake = mRandom() < 0.0015
-		local lightning = mRandom() < 0.01
-		local dust = mRandom() < 0.2
+		local quake = 0.001
+		local lightning = 0.0033
+		local dust = 0.1
+		if w.targetUnitID and w.underUnitID then
+			local dist = spGetUnitSeparation(w.targetUnitID, w.underUnitID)
+			if dist then
+				-- more quake sounds, lightning, and dust as worm nears a unit
+				local nearness = 1 - (dist / wormSpawnDistance)
+				quake = mMax(quake, nearness * 0.01)
+				lightning = mMax(lightning, nearness * 0.035)
+				dust = mMax(dust, nearness * 0.35)
+			end
+		end
+		quake = mRandom() < quake
+		lightning = mRandom() < lightning
+		dust = mRandom() < dust
 		if quake then
 			local y = spGetGroundHeight(w.x, w.z)
 			local snd = quakeSnds[mRandom(#quakeSnds)]
@@ -985,7 +1001,7 @@ local function doWormMovementAndEffects(gf, second)
 				wormLittleSign(w)
 			end
 		end
-		if w.emergedID and mRandom() < 0.015 then
+		if w.emergedID and mRandom() < 0.008 then
 			wormMediumSign(w)
 		end
 	end
