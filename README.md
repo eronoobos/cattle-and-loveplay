@@ -258,11 +258,11 @@ v6 -> v7
 - / build helper requests isNotValid, sand restrict gadget provides on demand
 - / worm radar highlights w/ crosshair in minimap and edge arrows when new worm appears
 - / when one of your units is being eaten, crosshairs
-- worm appears jumpy on radar with deferred pathing, because of vx vz missing for a second before pathing updates. fix.
+- / config in one include
+- / worm appears jumpy on radar with deferred pathing, because of vx vz missing for a second before pathing updates. fix.
 - update build pic
 - add nighttime dust and dirt ceg bitmaps (how?)
 - delete unecessary files
-- config, common functions, and localization in one include
 - fix unitscript errors (check if piece is valid before exploding it?)
 - smooth transition from underworm to emerged if possible
 - make lightning more efficient with opengl lines?
