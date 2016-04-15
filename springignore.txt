@@ -6,3 +6,6 @@
 #
 /.git
 /.svn
+/.gitattributes
+/.gitignore
+/.README.md

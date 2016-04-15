@@ -909,8 +909,8 @@ local function wormAttack(targetID, wID)
 		local rbdx, rbdz = x - rockbx, z - rockbz -- reverse distance, to get angle from rock to unit
 		local rockbdist = mSqrt((rbdx*rbdx)+(rbdz*rbdz))
 		if rockbdist < w.size.radius then
-			-- not enough room to attack, ignore target for 15 seconds
-			w.size.badTargets[targetID] = spGetGameSeconds() + 15
+			-- not enough room to attack, ignore target for 30 seconds
+			w.size.badTargets[targetID] = spGetGameSeconds() + 30
 			return
 		elseif rockbdist < awayFromRock then
 			rockx = (rockx + rockbx) / 2
