@@ -734,7 +734,6 @@ local function wormReceivePath(w, path)
 		w.pathStep = 2
 	end
 	w.targetNode = w.path[w.pathStep]
-	w.xPathed, w.zPathed = w.tx, w.tz
 	w.clearShot = true
 	if #w.path > 2 then
 		for i = 2, #w.path-1 do
@@ -773,7 +772,7 @@ local function wormDirect(w)
 	local r = w.size.radius
 	if not (tx < x + r and tx > x - r and tz < z + r and tz > z - r) then
 		-- not near the target yet
-		if not w.pathTry and (not w.path or (w.xPathed ~= tx and w.zPathed ~= tz)) then
+		if w.xPathed ~= tx and w.zPathed ~= tz then
 			-- need a new path
 			local graph = w.size.wormGraph
 			local startNode = nodeHere(x, z, graph, w.size.nodeSize) or w.targetNode
@@ -781,8 +780,8 @@ local function wormDirect(w)
 				local goalNode = nodeHere(tx, tz, graph, w.size.nodeSize)
 				if goalNode and startNode ~= goalNode then
 					w.pathTry = astar.pathtry(startNode, goalNode, graph, false, w.size.neighbor_node_func)
-					w.path = nil
-					w.targetNode = nil
+					w.xPathed, w.zPathed = tx, tz
+					-- spEcho("looking for new path")
 					wormFindPath(w) -- try once
 					-- will do path calculations later in doWormMovementAndEffects
 				end
@@ -796,12 +795,13 @@ local function wormDirect(w)
 				w.pathStep = w.pathStep + 1
 				w.targetNode = w.path[w.pathStep]
 				-- spEcho("going to next node", w.pathStep, tx, tz)
-			else
-				-- still need to get to the targetNode
-				tx, tz = w.targetNode.x, w.targetNode.y
+			-- else
+				-- spEcho("going to target node")
 			end
+			tx, tz = w.targetNode.x, w.targetNode.y
 		end
 	end
+	-- if tx == w.tx then spEcho("not using any path") end
 	local distx = tx - x
 	local distz = tz - z
 	w.vx, w.vz = normalizeVector2d(distx, distz)
@@ -947,13 +947,16 @@ end
 local function doWormMovementAndEffects(gf, second)
 	for wID, w in pairs(worm) do
 		if not w.emergedID then
-			if not w.path and w.pathTry then
+			if w.pathTry then
 				wormFindPath(w)
-				wormDirect(w)
+				if not w.pathTry then
+					wormDirect(w)
+				end
 			end
 			if w.vx then
 				w.x = mapClampX(w.x + (w.vx*w.speed))
 				w.z = mapClampZ(w.z + (w.vz*w.speed))
+				wormMoveUnderUnit(w) -- catch up worm under unit to current worm position
 				-- SendToUnsynced("passWorm", wID, w.x, w.z, w.vx, w.vz, w.vx, w.vz, w.tx, w.tz, w.signSecond, w.endSecond ) --uncomment this to show the worms positions, vectors, and targets real time (uses gui_worm_debug.lua)
 
 			end
@@ -1149,7 +1152,6 @@ function gadget:GameFrame(gf)
 	if gf % 30 == 0 then
 		for wID, w in pairs(worm) do
 			wormDirect(w)
-			wormMoveUnderUnit(w) -- catch up worm under unit to current worm position
 		end
 	end
 

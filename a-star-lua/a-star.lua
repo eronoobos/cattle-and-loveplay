@@ -290,7 +290,7 @@ function astar.work_pathtry( pathTry, iterations )
 	if not cachedPaths [ pathTry.start ] then
 		cachedPaths [ pathTry.start ] = {}
 	elseif cachedPaths [ pathTry.start ] [ pathTry.goal ] then
-		return cachedPaths [ pathTry.start ] [ pathTry.goal ]
+		return cachedPaths [ pathTry.start ] [ pathTry.goal ], 0
 	end
 	return work_on_pathtry(pathTry, iterations)
 end
