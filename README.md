@@ -261,6 +261,7 @@ v6 -> v7
 - update build pic
 - add nighttime dust and dirt ceg bitmaps (how?)
 - delete unecessary files
+- config, common functions, and localization in one include
 - fix unitscript errors (check if piece is valid before exploding it?)
 - smooth transition from underworm to emerged if possible
 - make lightning more efficient with opengl lines?

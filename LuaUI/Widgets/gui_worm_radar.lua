@@ -15,12 +15,10 @@ local areWorms = true
 local alertDuration = 5 -- how long in seconds each sign lasts on screen
 local flashDuration = 5 -- frames per flash
 
-local underwormDefID = UnitDefNames.underworm.id
-local wormEmergeUnitNames = { 
-	["sworm1"] = 1,
-	["sworm2"] = 2,
-	["sworm3"] = 3,
-	["sworm4"] = 4, }
+local wormConfig = VFS.Include('wormconfig/wormconfig.lua')
+local wormEmergeUnitNames = wormConfig.wormEmergeUnitNames
+local wormUnderUnitName = wormConfig.wormUnderUnitName
+local underwormDefID = UnitDefNames[wormUnderUnitName].id
 
 local signTex = "icons/underworm.png"
 local attackTex = "icons/sworm.png"
@@ -54,6 +52,8 @@ local nextAttackAlert = 0
 
 local mSqrt = math.sqrt
 local tInsert = table.insert
+
+local Spring.
 
 -- local functions
 

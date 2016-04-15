@@ -13,7 +13,8 @@ end
 local restrictSand = true
 local isNotValid
 
-local sandType = { ["Sand"] = true }
+local wormConfig = VFS.Include('wormconfig/wormconfig.lua')
+local sandType = wormConfig.sandType
 
 local bx, by, bz
 local mouseX, mouseY

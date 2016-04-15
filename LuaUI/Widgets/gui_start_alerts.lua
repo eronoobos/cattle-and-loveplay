@@ -16,8 +16,10 @@ local restrictSand = true
 local sinkWrecks = false
 local areWorms = true
 
+local wormConfig = VFS.Include('wormconfig/wormconfig.lua')
+local sandType = wormConfig.sandType
+
 local startDelay = 1 -- how many frames to keep alert
-local sandType = { ["Sand"] = true }
 local sandGraph
 local sandNodeSize = 256
 local sandNodeDist = ((sandNodeSize / 2)^2 * 2)
