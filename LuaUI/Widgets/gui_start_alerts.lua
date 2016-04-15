@@ -25,13 +25,15 @@ local sandNodeSize = 256
 local sandNodeDist = ((sandNodeSize / 2)^2 * 2)
 local astar
 
+local alertR, alertG, alertB = 1.0, 0.63, 0.33
+
 local sandTitle
 local sandWarning
 
 local alertCounter
 local nodeX, nodeY, nodeZ
-local myHeaderFont
 local myFont
+local myBodyFont
 local sizeX = Game.mapSizeX 
 local sizeZ = Game.mapSizeZ
 
@@ -40,7 +42,28 @@ local screenDisplayList = 0
 local alertHeight = 250
 
 local spGetGroundInfo = Spring.GetGroundInfo
-local tInsert = table.insert
+local spWorldToScreenCoords = Spring.WorldToScreenCoords
+local spGetGroundHeight = Spring.GetGroundHeight
+local spGetMapOptions = Spring.GetMapOptions
+local spGetCameraState = Spring.GetCameraState
+local spGetViewGeometry = Spring.GetViewGeometry
+local spGetTeamList = Spring.GetTeamList
+local spGetTeamStartPosition = Spring.GetTeamStartPosition
+local spTraceScreenRay = Spring.TraceScreenRay
+local spEcho = Spring.Echo
+
+local glCreateList = gl.CreateList
+local glCallList = gl.CallList
+local glDeleteList = gl.DeleteList
+local glColor = gl.Color
+local glLineWidth = gl.LineWidth
+local glBeginEnd = gl.BeginEnd
+local glVertex = gl.Vertex
+local glText = gl.Text
+local glRect = gl.Rect
+local glLoadFont = gl.LoadFont
+
+local GL_LINE_STRIP = GL.LINE_STRIP
 
 local function getSandGraph(nodeSize)
 	local halfNodeSize = nodeSize / 2
@@ -64,26 +87,25 @@ local function getSandGraph(nodeSize)
 			end
 			if sand then
 				local node = { x = x, y = z, id = id}
+				graph[id] = node
 				id = id + 1
-				tInsert(graph, node)
-				-- spMarkerAddPoint(x, 100, z, nodeSize)
 			end
 		end
 	end
 	return graph
 end
 
-local function DoLine(x1, y1, z1, x2, y2, z2)
-    gl.Vertex(x1, y1, z1)
-    gl.Vertex(x2, y2, z2)
+local function DoLine2d(x1, y1, x2, y2)
+    glVertex(x1, y1)
+    glVertex(x2, y2)
 end
 
 local function nearestNodeAtScreenCoords(sx, sy, nodes, nodeDist)
-	local _, pos = Spring.TraceScreenRay(sx, sy, true)
+	local _, pos = spTraceScreenRay(sx, sy, true)
 	if pos then
 		local node = astar.nearest_node(pos[1], pos[3], nodes, nodeDist)
 		if node then
-			return node.x, Spring.GetGroundHeight(node.x, node.y), node.y
+			return node.x, spGetGroundHeight(node.x, node.y), node.y
 		end
 	end
 end
@@ -98,54 +120,62 @@ local function cameraStatesMatch(stateA, stateB)
 end
 
 local function drawLandMarker(r, g, b, a, x1, y1, x2, y2, x3)
-	for n=5, 4, -1 do
+	for n=5, 3, -2 do
 		if n == 5 then
-			gl.LineWidth(4)
-			gl.Color(0, 0, 0, a)
+			glLineWidth(6)
+			glColor(0, 0, 0, a)
+			glBeginEnd(GL_LINE_STRIP, DoLine2d, x2, y1, x2+2, y1)
 		else
-			gl.LineWidth(2)
-			gl.Color(r, g, b, a)
+			glLineWidth(2)
+			glColor(r, g, b, a)
 		end
 		if x3 then
-			gl.BeginEnd(GL.LINE_STRIP, DoLine, x1, y1, 0, x3, y1, 0)
-			gl.BeginEnd(GL.LINE_STRIP, DoLine, x3, y1, 0, x3, y2, 0)
-			gl.BeginEnd(GL.LINE_STRIP, DoLine, x3, y2, 0, x2, y2, 0)
+			glBeginEnd(GL_LINE_STRIP, DoLine2d, x1, y1, x3, y1)
+			glBeginEnd(GL_LINE_STRIP, DoLine2d, x3, y1, x3, y2)
+			glBeginEnd(GL_LINE_STRIP, DoLine2d, x3, y2, x2, y2)
 		else
-			gl.BeginEnd(GL.LINE_STRIP, DoLine, x1, y1, 0, x2, y1, 0)
-			gl.BeginEnd(GL.LINE_STRIP, DoLine, x2, y1, 0, x2, y2, 0)
+			glBeginEnd(GL_LINE_STRIP, DoLine2d, x1, y1, x2, y1)
+			glBeginEnd(GL_LINE_STRIP, DoLine2d, x2, y1, x2, y2)
 		end
-		gl.Rect(x2-n, y2-n, x2+n, y2+n)
+		glRect(x2-n, y2-n, x2+n, y2+n)
 	end
 end
 
 local function drawStartPosCaution(scrX,scrY)
+	myFont:Begin()
+	myFont:SetTextColor(1.0, 0.0, 0.0, 1.0)
 	myFont:Print("CAUTION", scrX, scrY+30, 20, "cdo")
-	myFont:Print("CAUTION", scrX, scrY+30, 20, "cd")
 	myFont:Print("SAND", scrX, scrY-30, 20, "cao")
-	myFont:Print("SAND", scrX, scrY-30, 20, "ca")
+	myFont:End()
 end
 
 local function drawAlerts(viewX, viewY, sx, sy, alertX, alertSlide, alertOpacity)
-	gl.Color(1, 0.9, 0.5, 1)
-	myFont:Print(sandTitle, alertX, viewY*0.3, 36, "rvno")
-	myFont:Print(sandTitle, alertX, viewY*0.3, 36, "rvn")
-	myFont:Print(sandWarning, alertX, viewY*0.26, 16, "rvo")
-	myFont:Print(sandWarning, alertX, viewY*0.26, 16, "rv")
+	-- glColor(1, 0.9, 0.5, 1)
+	glColor(1, 1, 1, 1)
+	myFont:Begin()
+	myFont:SetTextColor(alertR, alertG, alertB, 1.0)
+	myFont:Print(sandTitle, alertX, viewY*0.4, 36, "rvo")
+	myFont:End()
+	myBodyFont:Begin()
+	myBodyFont:SetTextColor(alertR, alertG, alertB, 1.0)
+	myBodyFont:Print(sandWarning, alertX, viewY*0.36, 16, "rvo")
+	myBodyFont:End()
+	-- myBodyFont:Print(sandWarning, alertX, viewY*0.36, 16, "rv")
 	if sx then
 		if sx > viewX*0.65 then
-			drawLandMarker(1.0, 0.9, 0.5, alertOpacity, viewX*0.61*alertSlide, viewY*0.3, sx, sy)
+			drawLandMarker(alertR, alertG, alertB, alertOpacity, viewX*0.61*alertSlide, viewY*0.4, sx, sy)
 		else
-			drawLandMarker(1.0, 0.9, 0.5, alertOpacity, viewX*0.61*alertSlide, viewY*0.3, sx, sy, viewX*0.63)
+			drawLandMarker(alertR, alertG, alertB, alertOpacity, viewX*0.61*alertSlide, viewY*0.4, sx, sy, viewX*0.63)
 		end
 	end
-	gl.Color(1, 1, 1, 0.5)
+	glColor(1, 1, 1, 0.5)
 end
 
 
 -- callins
 
 function widget:Initialize()
-	local mapOptions = Spring.GetMapOptions()
+	local mapOptions = spGetMapOptions()
 	if mapOptions then
 		if mapOptions.restrict_sand_building == "0" then
 			restrictSand = false
@@ -158,7 +188,7 @@ function widget:Initialize()
 		end
 	end
 	if not restrictSand and not sinkWrecks and not areWorms then
-		Spring.Echo("No map options have been enabled. Start Alerts widget has been disbled.")
+		spEcho("No map options have been enabled. Start Alerts widget has been disbled.")
 		widgetHandler:RemoveWidget()
 	else
 		if restrictSand and not sinkWrecks then
@@ -172,7 +202,8 @@ function widget:Initialize()
 			sandWarning = "Non-metal-extracting structures & wrecks sink."
 		end
 		alertCounter = 50
-		myFont = gl.LoadFont("LuaUI/Fonts/Orbitron Bold.ttf", 72, 12)
+		myFont = glLoadFont('LuaUI/Fonts/Orbitron Bold.ttf', 36, 4, 10)
+		myBodyFont = glLoadFont('LuaUI/Fonts/Orbitron Bold.ttf', 16, 4, 5)
 		if areWorms then
 			sandTitle = "HAZARDOUS SAND"
 			sandWarning = sandWarning .. " Worms eat units."
@@ -193,7 +224,7 @@ function widget:Update(dt)
 	if alertCounter > 0 then
 		alertCounter = alertCounter - 1
 	end
-	local camState = Spring.GetCameraState()
+	local camState = spGetCameraState()
 	local camsMatch =  cameraStatesMatch(camState, lastCamState)
 	if lastAlertCounter == 0 and alertCounter == 0 and camsMatch then
 		return
@@ -207,7 +238,7 @@ function widget:Update(dt)
 		alertOpacity = (50 - alertCounter) / 50
 		alertSlide = (50 - alertCounter) / 50
 	end
-	local viewX, viewY, posX, posY = Spring.GetViewGeometry()
+	local viewX, viewY, posX, posY = spGetViewGeometry()
 	local centerX = (viewX / 2)
 	local centerY = (viewY / 2)	
 	local alertX = viewX*0.6*alertSlide
@@ -225,29 +256,31 @@ function widget:Update(dt)
 	end
 	local sx, sy
 	if nodeX then
-		sx, sy = Spring.WorldToScreenCoords(nodeX, nodeY, nodeZ)
+		sx, sy = spWorldToScreenCoords(nodeX, nodeY, nodeZ)
 	end
-	screenDisplayList = gl.CreateList(drawAlerts, viewX, viewY, sx, sy, alertX, alertSlide, alertOpacity, sandyStarts)
+	screenDisplayList = glCreateList(drawAlerts, viewX, viewY, sx, sy, alertX, alertSlide, alertOpacity, sandyStarts)
 	lastCamState = camState
 	lastAlertCounter = alertCounter
 end
 
 function widget:DrawScreen()
 	if (restrictSand or areWorms) and not gameStarted then
-		gl.Color(1, 0, 0, 1)
-		for _,t in ipairs(Spring.GetTeamList()) do
-			local x,y,z = Spring.GetTeamStartPosition(t)
+		glColor(1, 0, 0, 1)
+		local teamList = spGetTeamList()
+		for i = 1, #teamList do
+			local t = teamList[i]
+			local x,y,z = spGetTeamStartPosition(t)
 			if x and x > 0 and z > 0 then
-				local groundType, _ = Spring.GetGroundInfo(x, z)
+				local groundType, _ = spGetGroundInfo(x, z)
 				if sandType[groundType] then
-					local scrX, scrY = Spring.WorldToScreenCoords(x,y,z)
+					local scrX, scrY = spWorldToScreenCoords(x,y,z)
 					drawStartPosCaution(scrX,scrY)
 				end
 			end
 		end
-		gl.Color(1, 1, 1, 0.5)
+		glColor(1, 1, 1, 0.5)
 	end
-	gl.CallList(screenDisplayList)
+	glCallList(screenDisplayList)
 end
 
 function widget:GameFrame(f)
@@ -255,4 +288,8 @@ function widget:GameFrame(f)
 		gameStarted = true
 		alertCounter = 80
 	end
+end
+
+function widget:Shutdown()
+	glDeleteList(screenDisplayList)
 end
