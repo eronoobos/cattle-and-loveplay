@@ -723,8 +723,7 @@ local function wormMoveUnderUnit(w)
 	if not w.underUnitID then return end
 	spSetUnitPosition(w.underUnitID, w.x, w.z)
 	if w.vx then
-		-- spSetUnitVelocity(w.underUnitID, w.vx, 0, w.vz)
-		spMoveCtrlSetVelocity(w.underUnitID, w.vx, 0, w.vz)
+		-- spMoveCtrlSetVelocity(w.underUnitID, w.vx, 0, w.vz)
 	end
 end
 
