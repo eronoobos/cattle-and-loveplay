@@ -722,9 +722,9 @@ end
 local function wormMoveUnderUnit(w)
 	if not w.underUnitID then return end
 	spSetUnitPosition(w.underUnitID, w.x, w.z)
-	if w.vx then
+	-- if w.vx then
 		-- spMoveCtrlSetVelocity(w.underUnitID, w.vx, 0, w.vz)
-	end
+	-- end
 end
 
 local function wormReceivePath(w, path)
