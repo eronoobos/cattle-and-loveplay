@@ -59,7 +59,6 @@ local glColor = gl.Color
 local glLineWidth = gl.LineWidth
 local glBeginEnd = gl.BeginEnd
 local glVertex = gl.Vertex
-local glText = gl.Text
 local glRect = gl.Rect
 local glLoadFont = gl.LoadFont
 

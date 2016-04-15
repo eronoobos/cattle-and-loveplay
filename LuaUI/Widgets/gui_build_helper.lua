@@ -24,26 +24,51 @@ local lastFacing
 local myBadFeet
 local worldDisplayList = 0
 local screenDisplayList = 0
-local myfont
+local myFont
+
+local spGetGroundInfo = Spring.GetGroundInfo
+local spWorldToScreenCoords = Spring.WorldToScreenCoords
+local spGetMapOptions = Spring.GetMapOptions
+local spGetCameraState = Spring.GetCameraState
+local spTraceScreenRay = Spring.TraceScreenRay
+local spGetMouseState = Spring.GetMouseState
+local spGetBuildFacing = Spring.GetBuildFacing
+local spGetActiveCommand = Spring.GetActiveCommand
+local spSendLuaGaiaMsg = Spring.SendLuaGaiaMsg
+local spPos2BuildPos = Spring.Pos2BuildPos
+local spEcho = Spring.Echo
+
+local glCreateList = gl.CreateList
+local glCallList = gl.CallList
+local glDeleteList = gl.DeleteList
+local glColor = gl.Color
+local glBeginEnd = gl.BeginEnd
+local glVertex = gl.Vertex
+local glLoadFont = gl.LoadFont
+local glPushMatrix = gl.PushMatrix
+local glPopMatrix = gl.PopMatrix
+local glDepthTest = gl.DepthTest
+
+local GL_TRIANGLE_STRIP = GL.TRIANGLE_STRIP
 
 function passIsNotValid(uDefID)
    isNotValid[uDefID] = true
---   Spring.Echo(uDefID, 'received by widget')
+--   spEcho(uDefID, 'received by widget')
 end
 
 local function DoLine(x1, y1, z1, x2, y2, z2)
-    gl.Vertex(x1, y1, z1)
-    gl.Vertex(x2, y2, z2)
+    glVertex(x1, y1, z1)
+    glVertex(x2, y2, z2)
 end
 
 local function DoTriangle(x1, y1, z1, x2, y2, z2, x3, y3, z3)
-	gl.Vertex(x1, y1, z1)
-    gl.Vertex(x2, y2, z2)
-    gl.Vertex(x3, y3, z3)
+	glVertex(x1, y1, z1)
+    glVertex(x2, y2, z2)
+    glVertex(x3, y3, z3)
 end
 
 local function footprintOnSand(x, z, unitDefID, facing)
-	-- if sandType[Spring.GetGroundInfo(x,z)] then return true end
+	-- if sandType[spGetGroundInfo(x,z)] then return true end
 	local uDef = UnitDefs[unitDefID]
 	if not uDef then return end
 	local halfFootprintX = uDef.xsize * 4
@@ -53,23 +78,21 @@ local function footprintOnSand(x, z, unitDefID, facing)
 		halfFootprintZ = halfFootprintX
 		halfFootprintX = hfpz
 	end
-	-- Spring.Echo(uDef.xsize, uDef.zsize, halfFootprintX, halfFootprintZ)
+	-- spEcho(uDef.xsize, uDef.zsize, halfFootprintX, halfFootprintZ)
 	local xmin = x - halfFootprintX
 	local xmax = x + halfFootprintX
 	local zmin = z - halfFootprintZ
 	local zmax = z + halfFootprintZ
-	-- Spring.MarkerAddPoint(xmin, 100, zmin, "min")
-	-- Spring.MarkerAddPoint(xmax, 100, zmax, "max")
 	local badFeet = {}
 	for tx = xmin, xmax, 16 do
 		for tz = zmin, zmax, 16 do
-			local groundType = Spring.GetGroundInfo(tx, tz)
+			local groundType = spGetGroundInfo(tx, tz)
 			if groundType then
 				if sandType[groundType] then
 					local fx, fz = tx, tz
 					if tx == xmax then fx = tx - 16 end
 					if tz == zmax then fz = tz - 16 end
-					table.insert(badFeet, {x = fx, z = fz} )
+					badFeet[#badFeet+1] = {x = fx, z = fz}
 				end
 			end
 		end
@@ -81,30 +104,31 @@ end
 local function DrawBuildWarning()
 	local x, y, z = bx, by, bz
 			
-	gl.DepthTest(false)
-	gl.PushMatrix()
+	glDepthTest(false)
+	glPushMatrix()
 		
-	gl.Color(1, 0, 0, 1)
-	for _, foot in pairs(myBadFeet) do
-		gl.BeginEnd(GL.TRIANGLE_STRIP, DoTriangle, foot.x, y, foot.z, foot.x+16, y, foot.z, foot.x+16, y, foot.z+16)
-		gl.BeginEnd(GL.TRIANGLE_STRIP, DoTriangle, foot.x, y, foot.z, foot.x, y, foot.z+16, foot.x+16, y, foot.z+16)
+	glColor(1, 0, 0, 1)
+	for i = 1, #myBadFeet do
+		local foot = myBadFeet[i]
+		glBeginEnd(GL_TRIANGLE_STRIP, DoTriangle, foot.x, y, foot.z, foot.x+16, y, foot.z, foot.x+16, y, foot.z+16)
+		glBeginEnd(GL_TRIANGLE_STRIP, DoTriangle, foot.x, y, foot.z, foot.x, y, foot.z+16, foot.x+16, y, foot.z+16)
 	end
-	gl.Color(1, 1, 1, 0.5)
+	glColor(1, 1, 1, 0.5)
 
-	gl.PopMatrix()
-	gl.DepthTest(true)
+	glPopMatrix()
+	glDepthTest(true)
 end
 
 local function DrawWarningText()
-	local x1, y1 = Spring.WorldToScreenCoords(myBadFeet[1].x, by, myBadFeet[1].z)
-	local x2, y2 = Spring.WorldToScreenCoords(myBadFeet[#myBadFeet].x, by, myBadFeet[#myBadFeet].z+16)
+	local x1, y1 = spWorldToScreenCoords(myBadFeet[1].x, by, myBadFeet[1].z)
+	local x2, y2 = spWorldToScreenCoords(myBadFeet[#myBadFeet].x, by, myBadFeet[#myBadFeet].z+16)
 	local x = (x1 + x2) / 2
-	gl.Color(1, 0, 0, 1.0)
+	glColor(1, 0, 0, 1.0)
 	myFont:Print("CAUTION", x, y1+4, 20, "cdo")
 	myFont:Print("CAUTION", x, y1+4, 20, "cd")
 	myFont:Print("SAND", x, y2-4, 20, "cao")
 	myFont:Print("SAND", x, y2-4, 20, "ca")
-	gl.Color(1, 1, 1, 0.5)
+	glColor(1, 1, 1, 0.5)
 end
 
 local function CameraStatesMatch(stateA, stateB)
@@ -122,72 +146,72 @@ end
 -- end
 
 function widget:Initialize()
-	myFont = gl.LoadFont("LuaUI/Fonts/Orbitron Bold.ttf", 72, 12)
-	if Spring.GetMapOptions().restrict_sand_building == "0" then
+	myFont = glLoadFont('LuaUI/Fonts/Orbitron Bold.ttf', 36, 4, 10)
+	if spGetMapOptions().restrict_sand_building == "0" then
 		restrictSand = false
 	end
 	if not restrictSand then
-		Spring.Echo("Restrict Building on Sand is not on. Sand Build Command Helper widget has been disabled.")
+		spEcho("Restrict Building on Sand is not on. Sand Build Command Helper widget has been disabled.")
 		widgetHandler:RemoveWidget()
 	else
 		isNotValid = {}
 		widgetHandler:RegisterGlobal("passIsNotValid", passIsNotValid) --so that widget can receive isNotValid from sand_restrict gadget
-		Spring.SendLuaGaiaMsg('Sand Build Helper Widget Loaded')
+		spSendLuaGaiaMsg('Sand Build Helper Widget Loaded')
 	end
 end 
 
 -- function widget:MouseMove(mx, my, dx, dy, button)
 function widget:Update(dt)
 	if not restrictSand then return end
-	local _, cmdID = Spring.GetActiveCommand()
+	local _, cmdID = spGetActiveCommand()
 	if cmdID and isNotValid[-cmdID] then
-		local mx, my = Spring.GetMouseState()
-		local facing = Spring.GetBuildFacing()
-		local camState = Spring.GetCameraState()
+		local mx, my = spGetMouseState()
+		local facing = spGetBuildFacing()
+		local camState = spGetCameraState()
 		if mx ~= mouseX or my ~= mouseY or cmdID ~= lastCmdID or facing ~= lastFacing or not CameraStatesMatch(camState, lastCamState) then
-			-- if not CameraStatesMatch(camState, lastCamState) then Spring.Echo("cam states don't match") end
+			-- if not CameraStatesMatch(camState, lastCamState) then spEcho("cam states don't match") end
 			mouseX, mouseY = mx, my
 			lastCamState = camState
 			lastCmdID = cmdID
 			lastFacing = facing
-			local _, pos = Spring.TraceScreenRay(mx, my, true)
-			-- Spring.Echo("pos", mx, my, pos[1], pos[3])
+			local _, pos = spTraceScreenRay(mx, my, true)
+			-- spEcho("pos", mx, my, pos[1], pos[3])
 			if not pos then return end
-			local facing = Spring.GetBuildFacing()
-			local px, py, pz = Spring.Pos2BuildPos(-cmdID, pos[1], pos[2], pos[3], facing)
+			local facing = spGetBuildFacing()
+			local px, py, pz = spPos2BuildPos(-cmdID, pos[1], pos[2], pos[3], facing)
 			local badFeet = footprintOnSand(px, pz, -cmdID, facing)
 			if badFeet then
-				-- Spring.Echo("badfeet")
+				-- spEcho("badfeet")
 				myBadFeet = badFeet
 				bx, by, bz = px, py, pz
-				worldDisplayList = gl.CreateList(DrawBuildWarning)
-				screenDisplayList = gl.CreateList(DrawWarningText)
+				worldDisplayList = glCreateList(DrawBuildWarning)
+				screenDisplayList = glCreateList(DrawWarningText)
 			else
-				gl.DeleteList(worldDisplayList)
+				glDeleteList(worldDisplayList)
 				worldDisplayList = 0
-				gl.DeleteList(screenDisplayList)
+				glDeleteList(screenDisplayList)
 				screenDisplayList = 0
 			end
 		end
 	else
-		gl.DeleteList(worldDisplayList)
+		glDeleteList(worldDisplayList)
 		worldDisplayList = 0
-		gl.DeleteList(screenDisplayList)
+		glDeleteList(screenDisplayList)
 		screenDisplayList = 0
 	end
 end
 
 function widget:DrawWorldPreUnit()
-	gl.CallList(worldDisplayList)
+	glCallList(worldDisplayList)
 end
 
 function widget:DrawScreen()
-	gl.CallList(screenDisplayList)
+	glCallList(screenDisplayList)
 end
 
 function widget:Shutdown()
-	gl.DeleteList(worldDisplayList)
-	gl.DeleteList(screenDisplayList)
+	glDeleteList(worldDisplayList)
+	glDeleteList(screenDisplayList)
 end
 
 function widget:GameStart()
