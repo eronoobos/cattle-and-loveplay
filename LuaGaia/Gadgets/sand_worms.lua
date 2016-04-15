@@ -441,7 +441,7 @@ local function getWormSizes(sizesByUnitName)
 	local sizes = {}
 	for unitName, s in pairs(sizesByUnitName) do
 		local uDef = UnitDefNames[unitName]
-		local nodeSize = mMax( 128, mCeil(uDef.radius * 2.1) )
+		local nodeSize = mCeil(uDef.radius * 2.1)
 		local wormGraph = getWormPathGraph(nodeSize)
 		local nodeDist = 1+ (2 * (nodeSize^2))
 		local neighbor_node_func = function ( node, neighbor ) 
@@ -725,6 +725,41 @@ local function wormMoveUnderUnit(w)
 	end
 end
 
+local function wormReceivePath(w, path)
+	if not path then return end
+	w.path = path
+	if not w.path[2] then
+		w.pathStep = 1
+	else
+		w.pathStep = 2
+	end
+	w.targetNode = w.path[w.pathStep]
+	w.xPathed, w.zPathed = w.tx, w.tz
+	w.clearShot = true
+	if #w.path > 2 then
+		for i = 2, #w.path-1 do
+			local node = w.path[i]
+			if node and #node.neighbors < 8 then
+				-- spEcho("path has rocks")
+				w.clearShot = false
+				break
+			end
+		end
+	end
+end
+
+local function wormFindPath(w)
+	local path, remaining = astar.work_pathtry(w.pathTry, 5)
+	-- Spring.Echo(remaining)
+	if path then
+		-- Spring.Echo("got path")
+		w.pathTry = nil
+		wormReceivePath(w, path)
+	elseif remaining == 0 then
+		w.pathTry = nil
+	end
+end
+
 local function wormDirect(w)
 	if w.emergedID then return end
 	if not w.tx then
@@ -738,34 +773,18 @@ local function wormDirect(w)
 	local r = w.size.radius
 	if not (tx < x + r and tx > x - r and tz < z + r and tz > z - r) then
 		-- not near the target yet
-		if not w.path or (w.xPathed ~= tx and w.zPathed ~= tz) then
+		if not w.pathTry and (not w.path or (w.xPathed ~= tx and w.zPathed ~= tz)) then
 			-- need a new path
 			local graph = w.size.wormGraph
 			local startNode = nodeHere(x, z, graph, w.size.nodeSize) or w.targetNode
 			if startNode then
 				local goalNode = nodeHere(tx, tz, graph, w.size.nodeSize)
 				if goalNode and startNode ~= goalNode then
-					w.path = astar.path(startNode, goalNode, graph, false, w.size.neighbor_node_func)
-					if w.path then
-						if not w.path[2] then
-							w.pathStep = 1
-						else
-							w.pathStep = 2
-						end
-						w.targetNode = w.path[w.pathStep]
-						w.xPathed, w.zPathed = tx, tz
-						w.clearShot = true
-						if #w.path > 2 then
-							for i = 2, #w.path-1 do
-								local node = w.path[i]
-								if node and #node.neighbors < 8 then
-									-- spEcho("path has rocks")
-									w.clearShot = false
-									break
-								end
-							end
-						end
-					end
+					w.pathTry = astar.pathtry(startNode, goalNode, graph, false, w.size.neighbor_node_func)
+					w.path = nil
+					w.targetNode = nil
+					wormFindPath(w) -- try once
+					-- will do path calculations later in doWormMovementAndEffects
 				end
 			end
 		end 
@@ -927,10 +946,17 @@ end
 
 local function doWormMovementAndEffects(gf, second)
 	for wID, w in pairs(worm) do
-		if w.vx and not w.emergedID then
-			w.x = mapClampX(w.x + (w.vx*w.speed))
-			w.z = mapClampZ(w.z + (w.vz*w.speed))
-			-- SendToUnsynced("passWorm", wID, w.x, w.z, w.vx, w.vz, w.vx, w.vz, w.tx, w.tz, w.signSecond, w.endSecond ) --uncomment this to show the worms positions, vectors, and targets real time (uses gui_worm_debug.lua)
+		if not w.emergedID then
+			if not w.path and w.pathTry then
+				wormFindPath(w)
+				wormDirect(w)
+			end
+			if w.vx then
+				w.x = mapClampX(w.x + (w.vx*w.speed))
+				w.z = mapClampZ(w.z + (w.vz*w.speed))
+				-- SendToUnsynced("passWorm", wID, w.x, w.z, w.vx, w.vz, w.vx, w.vz, w.tx, w.tz, w.signSecond, w.endSecond ) --uncomment this to show the worms positions, vectors, and targets real time (uses gui_worm_debug.lua)
+
+			end
 		end
 		local quake = mRandom() < 0.0015
 		local lightning = mRandom() < 0.01

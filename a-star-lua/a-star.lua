@@ -123,6 +123,50 @@ end
 -- pathfinding functions
 ----------------------------------------------------------------
 
+local function init_pathtry ( pathTry )
+	pathTry.closedset = {}
+	pathTry.openset = { pathTry.start }
+	pathTry.came_from = {}
+	pathTry.g_score = {}
+	pathTry.f_score = {}
+	pathTry.g_score[pathTry.start] = 0
+	pathTry.f_score[pathTry.start] = pathTry.g_score[pathTry.start] + heuristic_cost_estimate(pathTry.start, pathTry.goal)
+end
+
+local function work_on_pathtry ( pathTry, iterations )
+	local pt = pathTry
+	if pt.neighbor_node_func then is_neighbor_node = pt.neighbor_node_func end
+	if pt.valid_node_func then is_valid_node = pt.valid_node_func end
+	local it = 1
+	while #pt.openset > 0 and it <= iterations do
+		local current = lowest_f_score ( pt.openset, pt.f_score )
+		if current == pt.goal then
+			local path = unwind_path ( {}, pt.came_from, pt.goal )
+			path[#path+1] = pt.goal
+			return path, #pt.openset
+		end
+		remove_node ( pt.openset, current )		
+		pt.closedset[#pt.closedset+1] = current
+		local neighbors = neighbor_nodes ( current, pt.nodes )
+		for i = 1, #neighbors do
+			local neighbor = neighbors[i]
+			if not_in ( pt.closedset, neighbor ) then
+				local tentative_g_score = pt.g_score [ current ] + dist_between ( current, neighbor )
+				if not_in ( pt.openset, neighbor ) or tentative_g_score < pt.g_score [ neighbor ] then 
+					pt.came_from[ neighbor ] = current
+					pt.g_score 	[ neighbor ] = tentative_g_score
+					pt.f_score 	[ neighbor ] = pt.g_score [ neighbor ] + heuristic_cost_estimate ( neighbor, pt.goal )
+					if not_in ( pt.openset, neighbor ) then
+						pt.openset[#pt.openset+1] = neighbor
+					end
+				end
+			end
+		end
+		it = it + 1
+	end
+	return nil, #pt.openset
+end
+
 local function a_star ( start, goal, nodes, neighbor_node_func, valid_node_func )
 
 	local closedset = {}
@@ -233,6 +277,22 @@ function astar.nearest_node( x, y, nodes, nodeDist, valid_node_func )
 		end
 	end
 	return bestNode
+end
+
+function astar.pathtry( start, goal, nodes, ignore_cache, neighbor_node_func, valid_node_func )
+	local pathTry = { start=start, goal=goal, nodes=nodes, ignore_cache=ignore_cache, neighbor_node_func=neighbor_node_func, valid_node_func=valid_node_func }
+	init_pathtry(pathTry)
+	return pathTry
+end
+
+function astar.work_pathtry( pathTry, iterations )
+	if not cachedPaths then cachedPaths = {} end
+	if not cachedPaths [ pathTry.start ] then
+		cachedPaths [ pathTry.start ] = {}
+	elseif cachedPaths [ pathTry.start ] [ pathTry.goal ] then
+		return cachedPaths [ pathTry.start ] [ pathTry.goal ]
+	end
+	return work_on_pathtry(pathTry, iterations)
 end
 
 function astar.path ( start, goal, nodes, ignore_cache, neighbor_node_func, valid_node_func )
