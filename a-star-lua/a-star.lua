@@ -35,6 +35,12 @@ local INF = 1/0
 local cachedPaths = nil
 
 ----------------------------------------------------------------
+-- localized functions
+----------------------------------------------------------------
+
+local tInsert = table.insert
+
+----------------------------------------------------------------
 -- local functions
 ----------------------------------------------------------------
 
@@ -62,7 +68,8 @@ end
 
 local function lowest_f_score ( set, f_score )
 	local lowest, bestNode = INF, nil
-	for _, node in ipairs ( set ) do
+	for i = 1, #set do
+		local node = set[i]
 		local score = f_score [ node ]
 		if score < lowest then
 			lowest, bestNode = score, node
@@ -74,9 +81,10 @@ end
 local function neighbor_nodes ( theNode, nodes )
 	if theNode.neighbors then return theNode.neighbors end -- use cached neighbors
 	local neighbors = {}
-	for _, node in ipairs ( nodes ) do
+	for i = 1, #nodes do
+		local node = nodes[i]
 		if theNode ~= node and is_valid_node ( node ) and is_neighbor_node ( theNode, node ) then
-			table.insert ( neighbors, node )
+			neighbors[#neighbors+1] = node
 		end
 	end
 	theNode.neighbors = neighbors -- cache neighbors
@@ -84,14 +92,16 @@ local function neighbor_nodes ( theNode, nodes )
 end
 
 local function not_in ( set, theNode )
-	for _, node in ipairs ( set ) do
+	for i = 1, #set do
+		local node = set[i]
 		if node == theNode then return false end
 	end
 	return true
 end
 
 local function remove_node ( set, theNode )
-	for i, node in ipairs ( set ) do
+	for i = 1, #set do
+		local node = set[i]
 		if node == theNode then 
 			set [ i ] = set [ #set ]
 			set [ #set ] = nil
@@ -102,7 +112,7 @@ end
 
 local function unwind_path ( flat_path, map, current_node )
 	if map [ current_node ] then
-		table.insert ( flat_path, 1, map [ current_node ] ) 
+		tInsert ( flat_path, 1, map [ current_node ] ) 
 		return unwind_path ( flat_path, map, map [ current_node ] )
 	else
 		return flat_path
@@ -131,15 +141,16 @@ local function a_star ( start, goal, nodes, neighbor_node_func, valid_node_func 
 		local current = lowest_f_score ( openset, f_score )
 		if current == goal then
 			local path = unwind_path ( {}, came_from, goal )
-			table.insert ( path, goal )
+			path[#path+1] = goal
 			return path
 		end
 
 		remove_node ( openset, current )		
-		table.insert ( closedset, current )
+		closedset[#closedset+1] = current
 		
 		local neighbors = neighbor_nodes ( current, nodes )
-		for _, neighbor in ipairs ( neighbors ) do 
+		for i = 1, #neighbors do
+			local neighbor = neighbors[i]
 			if not_in ( closedset, neighbor ) then
 			
 				local tentative_g_score = g_score [ current ] + dist_between ( current, neighbor )
@@ -149,7 +160,7 @@ local function a_star ( start, goal, nodes, neighbor_node_func, valid_node_func 
 					g_score 	[ neighbor ] = tentative_g_score
 					f_score 	[ neighbor ] = g_score [ neighbor ] + heuristic_cost_estimate ( neighbor, goal )
 					if not_in ( openset, neighbor ) then
-						table.insert ( openset, neighbor )
+						openset[#openset+1] = neighbor
 					end
 				end
 			end
@@ -167,7 +178,8 @@ function astar.clear_cached_paths ()
 end
 
 function astar.clear_cached_neighbors ( nodes )
-	for _, node in ipairs ( nodes ) do
+	for i = 1, #nodes do
+		local node = nodes[i]
 		node.neighbors = nil	
 	end
 end
@@ -175,7 +187,8 @@ end
 function astar.cache_neighbors( nodes, neighbor_node_func, valid_node_func )
 	if neighbor_node_func then is_neighbor_node = neighbor_node_func end
 	if valid_node_func then is_valid_node = valid_node_func end
-	for _, node in ipairs(nodes) do
+	for i = 1, #nodes do
+		local node = nodes[i]
 		local neighbors = neighbor_nodes(node, nodes)
 	end
 end
@@ -190,7 +203,8 @@ function astar.find_node ( x, y, nodes, valid_node_func )
 	else
 		is_valid_node = function() return true end
 	end
-	for _, node in ipairs ( nodes ) do
+	for i = 1, #nodes do
+		local node = nodes[i]
 		if is_valid_node(node) then
 			if node.x == x and node.y == y then
 				return node
@@ -207,7 +221,8 @@ function astar.nearest_node( x, y, nodes, nodeDist, valid_node_func )
 	end
 	local bestDist
 	local bestNode
-	for _, node in ipairs ( nodes ) do
+	for i = 1, #nodes do
+		local node = nodes[i]
 		if is_valid_node(node) then
 			local d = dist(x, y, node.x, node.y)
 			if not bestDist or d < bestDist then

@@ -1,7 +1,7 @@
 function widget:GetInfo()
 	return {
 		name	= "Cattle and Loveplay: Sand Worm Radar",
-		desc	= "marks sand worm sign",
+		desc	= "marks sand worm signs",
 		author  = "zoggop",
 		date 	= "February 2012",
 		license	= "whatever",
@@ -13,7 +13,7 @@ end
 -- config
 local areWorms = true
 local alertDuration = 5 -- how long in seconds each sign lasts on screen
-local flashDuration = 0.33 -- seconds per flash
+local flashDuration = 0.2 -- seconds per flash
 
 local wormConfig = VFS.Include('wormconfig/wormconfig.lua')
 local wormEmergeUnitNames = wormConfig.wormEmergeUnitNames

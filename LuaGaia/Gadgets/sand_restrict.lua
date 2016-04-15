@@ -14,10 +14,11 @@ local cellSize = 64
 local halfCellSize = cellSize / 2
 local sizeX = Game.mapSizeX 
 local sizeZ = Game.mapSizeZ
-local wormConfig = VFS.Include('wormconfig/wormconfig.lua')
-local sandType = wormConfig.sandType
 local maxSlope = 0.25
 local buildSpacing = 16
+
+local wormConfig = VFS.Include('wormconfig/wormconfig.lua')
+local sandType = wormConfig.sandType
 
 -- these default values are changed in gadget:Initialize()
 local aiPresent = false

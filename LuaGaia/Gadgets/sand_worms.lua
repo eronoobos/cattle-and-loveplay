@@ -28,14 +28,6 @@ local sandType = wormConfig.sandType
 local wormEmergeUnitNames = wormConfig.wormEmergeUnitNames
 local wormUnderUnitName = wormConfig.wormUnderUnitName
 local wormTriggerUnitName = wormConfig.wormTriggerUnitName
--- local sandType = { ["Sand"] = true } -- the ground type that worm spawns in
--- local wormEmergeUnitNames = { 
--- 	["sworm1"] = 1,
--- 	["sworm2"] = 2,
--- 	["sworm3"] = 3,
--- 	["sworm4"] = 4, }
--- local wormUnderUnitName = "underworm" -- unit name for unit that moves around with the worm underground
--- local wormTriggerUnitName = "wormtrigger" -- unit name that when spawned deletes itself and spawns a worm
 local wormSpeedLowerBias = 10 -- percentage below wormSpeed that an individual worm's speed can be. lowers with high wormAnger
 local wormSpeedUpperBias = 10 -- percentage above wormSpeed that an individual worm's speed can be
 local boxSize = 1024 -- for finding occupied areas to spawn worms near
