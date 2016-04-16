@@ -13,7 +13,7 @@ end
 -- config
 local areWorms = true
 local alertDuration = 5 -- how long in seconds each sign lasts on screen
-local flashDuration = 0.2 -- seconds per flash
+local flashDuration = 0.25 -- seconds per flash
 
 local wormConfig = VFS.Include('wormconfig/wormconfig.lua')
 local wormEmergeUnitNames = wormConfig.wormEmergeUnitNames
@@ -42,15 +42,33 @@ local alertColor = 1
 local alertColors = {
 	{ r = 1, g = 0, b = 1, a = 1 }, 
 	{ r = 1, g = 0, b = 1, a = 0 }, 
-	{ r = 1, g = 0.25, b = 0, a = 1 }, 
-	{ r = 1, g = 0.25, b = 0, a = 0 } 
+	{ r = 1, g = 0.5, b = 0, a = 1 }, 
+	{ r = 1, g = 0.5, b = 0, a = 0 },
 }
+
+
 local arrowSizeHalf = arrowSize / 2
 local arrowIconSizeHalf = arrowIconSize / 2
 local lastFlash
 local lastAttackAlert
 
 local mSqrt = math.sqrt
+local mAbs = math.abs
+local mAtan2 = math.atan2
+local mRad = math.rad
+local mDeg = math.deg
+local pi = math.pi
+local halfPi = pi / 2
+
+local cornerAngle = 0.45
+local corners = {
+	{ min=0, max=cornerAngle, flip=1, yTop=1 },
+	{ min=pi-cornerAngle, max=pi, yTop=1 },
+	{ min=-cornerAngle, max=0, yBottom=1 },
+	{ min=-pi, max=cornerAngle-pi, flip=1, yBottom=1 },
+	{ min=-halfPi, max=cornerAngle-halfPi, flip=1, xTop=1 },
+	{ min=-halfPi-cornerAngle, max=-halfPi, xBottom=1 },
+}
 
 local tInsert = table.insert
 local tRemove = table.remove
@@ -102,8 +120,28 @@ local function drawArrow(x, y, viewX, viewY)
 	local centerX, centerY = viewX/2, viewY/2
 	local dx, dy = x-centerX, y-centerY
 	local vx, vy = normalizeVector2d(dx, dy)
-	if x > viewX then x1 = viewX elseif x < 0 then x1 = 0 else x1 = x end
-	if y > viewY then y1 = viewY elseif y < 0 then y1 = 0 else y1 = y end
+	-- Spring.Echo(vx, vy, mDeg(mAtan2(vy, vx)), mAtan2(vy, vx))
+	local zeroX, zeroY = 0, 0
+	local angle = mAtan2(vy, vx)
+	for i = 1, #corners do
+		local c = corners[i]
+		if angle > c.min and angle < c.max then
+			local need = (angle-c.min) /  cornerAngle
+			if c.flip then need = 1 - need end
+			local space = need * arrowSizeHalf
+			if c.xTop then
+				viewX = viewX - space
+			elseif c.xBottom then
+				zeroX = zeroX + space
+			elseif c.yTop then
+				viewY = viewY - space
+			elseif c.yBottom then
+				zeroY = zeroY + space
+			end
+		end
+	end
+	if x > viewX then x1 = viewX elseif x < zeroX then x1 = zeroX else x1 = x end
+	if y > viewY then y1 = viewY elseif y < zeroY then y1 = zeroY else y1 = y end
 	local backX, backY = x1-(vx*arrowSize), y1-(vy*arrowSize)
 	local x2, y2 = backX+(vy*arrowSizeHalf), backY-(vx*arrowSizeHalf)
 	local x3, y3 = backX-(vy*arrowSizeHalf), backY+(vx*arrowSizeHalf)
@@ -153,6 +191,7 @@ function widget:Initialize()
 	local cur = spGetTimer()
 	lastFlash = cur
 	lastAttackAlert = cur
+	-- wormAlerts[#wormAlerts+1] = {timer = cur, x=sizeX/2, y=100, z=sizeZ/2} -- for testing
 end
 
 function widget:UnitEnteredRadar(unitID, unitTeam, allyTeam, unitDefID)
@@ -214,7 +253,7 @@ function widget:Update(dt)
 	local flashAge = spDiffTimers(cur, lastFlash)
 	if flashAge > flashDuration then
 		alertColor = alertColor + 1
-		if alertColor > 4 then alertColor = 1 end
+		if alertColor > #alertColors then alertColor = 1 end
 		lastFlash = cur
 	end
 end
