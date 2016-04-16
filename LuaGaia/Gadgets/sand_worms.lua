@@ -229,7 +229,7 @@ end
 
 local function loadWormReDir()
 	if not VFS.FileExists('data/sand_worm_redirect_size.lua') or not VFS.FileExists('data/sand_worm_redirect_matrix.u8') then
-		spEcho("Could not load worm redirect matrix. Will use a different method to find nearest sand positions.")
+		spEcho("Could not load worm redirect matrix. Will use astar nodes to find nearest sand positions.")
 		return
 	end
 	local reDirSize = VFS.Include('data/sand_worm_redirect_size.lua')
@@ -245,6 +245,7 @@ local function loadWormReDir()
 		if reDir[cx] == nil then reDir[cx] = {} end
 		reDir[cx][cz] = { bx, bz }
 	end
+	spEcho("Worm redirect matrix loaded.")
 	return reDir
 end
 
@@ -373,7 +374,7 @@ local function nearestSand(x, z)
 			end
 		end
 	end
-	spEcho("no wormReDir, using astar.nearest_node")
+	-- spEcho("no wormReDir cell found. using astar.nearest_node...")
 	local node = astar.nearest_node(x, z, wormSizes[4].wormGraph)
 	return node.x, node.y
 end
