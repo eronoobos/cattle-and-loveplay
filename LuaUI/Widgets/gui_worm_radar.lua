@@ -68,6 +68,8 @@ local corners = {
 	{ min=-pi, max=cornerAngle-pi, flip=1, yBottom=1 },
 	{ min=-halfPi, max=cornerAngle-halfPi, flip=1, xTop=1 },
 	{ min=-halfPi-cornerAngle, max=-halfPi, xBottom=1 },
+	{ min=halfPi-cornerAngle, max=halfPi, xTop=1 },
+	{ min=halfPi, max=halfPi+cornerAngle, flip=1, xBottom=1 },
 }
 
 local tInsert = table.insert
