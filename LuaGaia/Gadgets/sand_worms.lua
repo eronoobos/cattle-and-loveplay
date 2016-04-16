@@ -453,7 +453,20 @@ local function getWormSizes(sizesByUnitName)
 			return false
 		end
 		-- astar.cache_neighbors(wormGraph, neighbor_node_func)
-		local size = { radius = uDef.radius, diameter = uDef.radius * 2, maxMealSize = mCeil(uDef.radius * 0.888), unitName = unitName, badTargets = {}, wormGraph = wormGraph, neighbor_node_func = neighbor_node_func, nodeSize = nodeSize }
+		local area = uDef.radius * uDef.radius * pi
+		local size = {
+			radius = uDef.radius,
+			diameter = uDef.radius * 2,
+			maxMealSize = mCeil(uDef.radius * 0.888),
+			unitName = unitName,
+			badTargets = {},
+			wormGraph = wormGraph,
+			neighbor_node_func = neighbor_node_func,
+			nodeSize = nodeSize,
+			dustProbMin = 0.003 * uDef.radius, -- 0.000027*area,
+			dustProbMax = 0.006 * uDef.radius, -- 0.000088*area,
+			dustDamage = uDef.radius * 0.25,
+		}
 		sizes[s] = size
 	end
 	return sizes
@@ -717,7 +730,7 @@ local function wormLittleSign(w, sx, sz)
 	end
 	arcLightningOverPoint( sx, sz, mRandom(minArc, maxArc) )
 	local snd = lightningLittleSnds[mRandom(#lightningLittleSnds)]
-	spPlaySoundFile(snd,0.1,sx,sy,sz)
+	spPlaySoundFile(snd,0.05,sx,sy,sz)
 end
 
 local function wormMoveUnderUnit(w)
@@ -966,15 +979,15 @@ local function doWormMovementAndEffects(gf, second)
 		end
 		local quake = 0.001
 		local lightning = 0.0033
-		local dust = 0.1
+		local dust = w.size.dustProbMin
 		if w.targetUnitID and w.underUnitID then
 			local dist = spGetUnitSeparation(w.targetUnitID, w.underUnitID)
 			if dist then
 				-- more quake sounds, lightning, and dust as worm nears a unit
 				local nearness = 1 - (dist / wormSpawnDistance)
-				quake = mMax(quake, nearness * 0.01)
-				lightning = mMax(lightning, nearness * 0.035)
-				dust = mMax(dust, nearness * 0.35)
+				quake = mMax(quake, nearness * 0.006)
+				lightning = mMax(lightning, nearness * 0.02)
+				dust = mMax(dust, nearness * w.size.dustProbMax)
 			end
 		end
 		quake = mRandom() < quake
@@ -991,7 +1004,9 @@ local function doWormMovementAndEffects(gf, second)
 			local groundType, _ = spGetGroundInfo(cegx, cegz)
 			if sandType[groundType] then
 				local cegy = spGetGroundHeight(cegx, cegz)
-				spSpawnCEG("sworm_dust",cegx,cegy,cegz,0,1,0,30,0)
+				-- spSpawnCEG("sworm_dust",cegx,cegy,cegz,0,1,0,30,0)
+				-- spSpawnCEG("sworm_dust",cegx,cegy,cegz,0,1,0,0,0)
+				spSpawnCEG("sworm_dust",cegx,cegy,cegz,0,1,0,1,w.size.dustDamage)
 			end
 		end
 		if lightning and not w.emergedID then
