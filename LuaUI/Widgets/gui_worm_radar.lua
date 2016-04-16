@@ -13,7 +13,7 @@ end
 -- config
 local areWorms = true
 local alertDuration = 5 -- how long in seconds each sign lasts on screen
-local flashDuration = 0.25 -- seconds per flash
+local flashDuration = 0.2 -- seconds per flash
 
 local wormConfig = VFS.Include('wormconfig/wormconfig.lua')
 local wormEmergeUnitNames = wormConfig.wormEmergeUnitNames

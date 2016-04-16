@@ -264,7 +264,7 @@ v6 -> v7
 - / delete unecessary files
 - / figure out how to make arrows fit in corners
 - / worms not attackable
-- fix start alert arrow pointing off-screen if you begin in the upper left
+- / fix start alert arrow pointing off-screen if you begin in the upper left
 - add nighttime dust and dirt ceg bitmaps (how?)
 - fix unitscript errors (check if piece is valid before exploding it?)
 - smooth transition from underworm to emerged if possible
