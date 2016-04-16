@@ -633,8 +633,8 @@ end
 
 local function signArcLightning(x1, z1, x2, z2, offsetMult, generationNum, branchProb, lightningCeg, flashCeg, minOffsetMultXZ, minOffsetMultY)
 	offsetMult = offsetMult or 0.4
-	generationNum = generationNum or 4
-	branchProb = branchProb or 0.25
+	generationNum = generationNum or 5
+	branchProb = branchProb or 0.2
 	lightningCeg = lightningCeg or "WORMSIGN_LIGHTNING_SMALL"
 	flashCeg = flashCeg or "WORMSIGN_FLASH_SMALL"
 	minOffsetMultXZ = minOffsetXZ or 0.05
@@ -698,7 +698,7 @@ local function wormMediumSign(w)
 	local angle = mRandom() * twicePi
 	local sx1, sz1 = CirclePos(w.x, w.z, w.size.radius*0.5, angle)
 	local sx2, sz2 = CirclePos(w.x, w.z, w.size.diameter, angle)
-	signArcLightning( sx1, sz1, sx2, sz2, nil, 5 )
+	signArcLightning( sx1, sz1, sx2, sz2 )
 	local snd = lightningMediumSnds[mRandom(#lightningMediumSnds)]
 	spPlaySoundFile(snd,0.1,sx,sy,sz)
 end
