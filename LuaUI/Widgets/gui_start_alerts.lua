@@ -223,7 +223,7 @@ function widget:Update(dt)
 	end
 	local camState = spGetCameraState()
 	local camsMatch =  cameraStatesMatch(camState, lastCamState)
-	if lastAlertCounter == 0 and alertCounter == 0 and camsMatch then
+	if lastAlertCounter == 0 and alertCounter == 0 and nodeX and camsMatch then
 		return
 	end
 	local alertOpacity = 1
@@ -239,22 +239,37 @@ function widget:Update(dt)
 	local centerX = (viewX / 2)
 	local centerY = (viewY / 2)	
 	local alertX = viewX*0.6*alertSlide
+	local sx, sy
+	if nodeX then
+		sx, sy = spWorldToScreenCoords(nodeX, nodeY, nodeZ)
+		if sx > viewX or sx < 0 or sy > viewY or sy < 0 then nodeX, nodeY, nodeZ = nil, nil, nil end
+	end
 	if not camsMatch or not nodeX then
 		nodeX, nodeY, nodeZ = nearestNodeAtScreenCoords(viewX*0.8, viewY*0.5, sandGraph, sandNodeDist)
-		if not nodeX then
+		if nodeX then
+			sx, sy = spWorldToScreenCoords(nodeX, nodeY, nodeZ)
+			if sx > viewX or sx < 0 or sy > viewY or sy < 0 then nodeX, nodeY, nodeZ = nil, nil, nil end
+		else
 			nodeX, nodeY, nodeZ = nearestNodeAtScreenCoords(viewX*0.4, viewY*0.5, sandGraph, sandNodeDist)
-			if not nodeX then
+			if nodeX then
+				sx, sy = spWorldToScreenCoords(nodeX, nodeY, nodeZ)
+				if sx > viewX or sx < 0 or sy > viewY or sy < 0 then nodeX, nodeY, nodeZ = nil, nil, nil end
+			else
 				nodeX, nodeY, nodeZ = nearestNodeAtScreenCoords(viewX*0.5, viewY*0.2, sandGraph, sandNodeDist)
-				if not nodeX then
+				if nodeX then
+					sx, sy = spWorldToScreenCoords(nodeX, nodeY, nodeZ)
+					if sx > viewX or sx < 0 or sy > viewY or sy < 0 then nodeX, nodeY, nodeZ = nil, nil, nil end
+				else
 					nodeX, nodeY, nodeZ = nearestNodeAtScreenCoords(viewX*0.5, viewY*0.8, sandGraph, sandNodeDist)
+					if nodeX then
+						sx, sy = spWorldToScreenCoords(nodeX, nodeY, nodeZ)
+						if sx > viewX or sx < 0 or sy > viewY or sy < 0 then nodeX, nodeY, nodeZ = nil, nil, nil end
+					end
 				end
 			end
 		end
 	end
-	local sx, sy
-	if nodeX then
-		sx, sy = spWorldToScreenCoords(nodeX, nodeY, nodeZ)
-	end
+	if not nodeX then sx, sy = nil, nil end
 	screenDisplayList = glCreateList(drawAlerts, viewX, viewY, sx, sy, alertX, alertSlide, alertOpacity, sandyStarts)
 	lastCamState = camState
 	lastAlertCounter = alertCounter
