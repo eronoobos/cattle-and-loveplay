@@ -60,7 +60,7 @@ local mDeg = math.deg
 local pi = math.pi
 local halfPi = pi / 2
 
-local cornerAngle = 0.45
+local cornerAngle = pi / 6
 local corners = {
 	{ min=0, max=cornerAngle, flip=1, yTop=1 },
 	{ min=pi-cornerAngle, max=pi, yTop=1 },
