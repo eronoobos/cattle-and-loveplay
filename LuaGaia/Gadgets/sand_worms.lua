@@ -453,7 +453,7 @@ local function getWormSizes(sizesByUnitName)
 			return false
 		end
 		-- astar.cache_neighbors(wormGraph, neighbor_node_func)
-		local area = uDef.radius * uDef.radius * pi
+		-- local area = uDef.radius * uDef.radius * pi
 		local size = {
 			radius = uDef.radius,
 			diameter = uDef.radius * 2,
@@ -466,6 +466,7 @@ local function getWormSizes(sizesByUnitName)
 			dustProbMin = 0.003 * uDef.radius, -- 0.000027*area,
 			dustProbMax = 0.006 * uDef.radius, -- 0.000088*area,
 			dustDamage = uDef.radius * 0.25,
+			dustRadius = uDef.radius,
 		}
 		sizes[s] = size
 	end
@@ -999,13 +1000,11 @@ local function doWormMovementAndEffects(gf, second)
 			spPlaySoundFile(snd,1.5,w.x,y,w.z)
 		end
 		if dust then
-			local cegx = mapClampX(w.x + mRandom(w.size.diameter) - w.size.radius)
-			local cegz = mapClampZ(w.z + mRandom(w.size.diameter) - w.size.radius)
+
+			local cegx, cegz = mapClampXZ( CirclePos(w.x, w.z, mRandom(w.size.dustRadius)) )
 			local groundType, _ = spGetGroundInfo(cegx, cegz)
 			if sandType[groundType] then
 				local cegy = spGetGroundHeight(cegx, cegz)
-				-- spSpawnCEG("sworm_dust",cegx,cegy,cegz,0,1,0,30,0)
-				-- spSpawnCEG("sworm_dust",cegx,cegy,cegz,0,1,0,0,0)
 				spSpawnCEG("sworm_dust",cegx,cegy,cegz,0,1,0,1,w.size.dustDamage)
 			end
 		end
