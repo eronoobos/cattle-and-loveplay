@@ -8,4 +8,6 @@
 /.svn
 /.gitattributes
 /.gitignore
-/.README.md
+/README.md
+/changes.txt
+/ReadmeImages

@@ -8,7 +8,7 @@ return {
       properties = {
         airdrag            = 1.0,
         alwaysvisible      = false,
-        colormap           = [[0.9 0.78 0.55 1.0	0 0 0 0.0]],
+        colormap           = [[0.9 0.72 0.44 1.0	0 0 0 0.0]],
         directional        = true,
         emitrot            = 90,
         emitrotspread      = 25,
@@ -35,7 +35,7 @@ return {
       properties = {
         airdrag            = 1.0,
         alwaysvisible      = false,
-        colormap           = [[0.9 0.78 0.55 1.0	0 0 0 0.0]],
+        colormap           = [[0.9 0.72 0.44 1.0	0 0 0 0.0]],
         directional        = true,
         emitrot            = 90,
         emitrotspread      = 25,
@@ -64,7 +64,7 @@ return {
       properties = {
         airdrag            = 0.9,
         alwaysvisible      = false,
-        colormap           = [[0 0 0 0.0  0.9 0.78 0.55 1.0  0 0 0 0.0]],
+        colormap           = [[0 0 0 0.0  0.9 0.72 0.44 1.0  0 0 0 0.0]],
         directional        = true,
         emitrot            = 90,
         emitrotspread      = 25,
@@ -91,7 +91,7 @@ return {
       properties = {
         airdrag            = 0.9,
         alwaysvisible      = false,
-        colormap           = [[0 0 0 0.0  0.9 0.78 0.55 1.0  0 0 0 0.0]],
+        colormap           = [[0 0 0 0.0  0.9 0.72 0.44 1.0  0 0 0 0.0]],
         directional        = true,
         emitrot            = 90,
         emitrotspread      = 25,
