@@ -4,8 +4,6 @@ Map for Spring RTS with sand worms.
 
 ## Installation
 
-- Put a release .sd7 into ~/.spring/maps/ or Documents/My Games/Spring/maps/
-
 - Get it on springfiles and put it in the same place. http://springfiles.com/spring/spring-maps/cattle-and-loveplay-0
 
 - Clone the repository into ~/.spring/cattle-and-loveplay.sdd/ or Documents/My Games/Spring/maps/cattle-and-loveplay.sdd/
