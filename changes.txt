@@ -3,7 +3,6 @@ todo?
 - add nighttime dust and dirt ceg bitmaps (how?)
 - fix unitscript errors (check if piece is valid before exploding it?)
 - smooth transition from underworm to emerged if possible
-- make lightning more efficient with opengl lines?
 - BAD IDEA?: rather than movectrl, wait until the worms lips are most of the way out of the sand, and then evaluate what is inside and eat it. use a four-lipped worm to form a cage from with units can't escape. the model must have lips halfway open, so that when the mouth is fully open, the colvols are at 45 degrees or so
 
 v7 -> v8
