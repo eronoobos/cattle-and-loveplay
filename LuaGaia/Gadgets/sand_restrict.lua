@@ -92,17 +92,15 @@ local function doInit()
 		  	ignore=true
 		  end
 		end
-		if not ignore and (uDef.extractsMetal == 0) and (uDef.maxAcc < 0.01) then --if it's not a metal extractor and does not move, it is not valid
-		  if strFind(uDef.tooltip, " Mine") == nil then --if it's a mine, it is valid
+		if not ignore and (uDef.extractsMetal == 0) and (uDef.maxAcc < 0.01) and not uDef.needGeo and not strFind(uDef.tooltip, " Mine") then --if it's not a metal extractor and does not move, it is not valid
 			isNotValid[uDefID] = true
 			SendToUnsynced("passIsNotValid", uDefID)
---			spEcho(uDefID, 'sent from gadget')
+	--			spEcho(uDefID, 'sent from gadget')
 			if aiPresent then
 			  elmoMaxSize[uDefID] = mMax(uDef.xsize, uDef.zsize) * 8
 			  elmoMaxSize[uDefID] = elmoMaxSize[uDefID] - (elmoMaxSize[uDefID] % 32) + 32
 			end
 		  end
-		end
 	  end
 	
 	
@@ -121,7 +119,7 @@ end
 
 local function loadReDir()
 	if not VFS.FileExists('data/redirect_sizes.lua') or not VFS.FileExists('data/build_redirect_matrix.u8') then
-		Sping.Echo("no redirect matrix files exist")
+		Spring.Echo("no redirect matrix files exist")
 		return
 	end
 	local reDirSizes = VFS.Include('data/redirect_sizes.lua')
@@ -147,7 +145,7 @@ end
 
 local function loadReReDir()
 	if not VFS.FileExists('data/redirect_sizes.lua') or not VFS.FileExists('data/redirect_redirect_matrix.u8') then
-		Sping.Echo("no redirect redirect matrix files exist")
+		Spring.Echo("no redirect redirect matrix files exist")
 		return
 	end
 	local reDirSizes = VFS.Include('data/redirect_sizes.lua')
@@ -264,15 +262,19 @@ local function getBuildRedirect(bx, bz, uDefID)
 	if reDir and reReDir then return redirectFromMatrix(bx, bz, uDefID) end
 	local uDef = UnitDefs[uDefID]
 	if not uDef then return end
-	local uSize = ((mMax(uDef.xsize, uDef.zsize) * 16) + buildSpacing) % 32
+	local uSize = (mMax(uDef.xsize, uDef.zsize) * 16) + buildSpacing
+	uSize = uSize - (uSize % 32)
+	-- Spring.Echo("looking for redirect for", uDef.name, uSize)
 	local buildGraph = buildGraphs[uSize] or getBuildGraph(uSize)
 	if not buildGraphs[uSize] then buildGraphs[uSize] = buildGraph end
 	local buildNodeSize = buildNodeSizes[uSize] or ((uSize / 2)^2 * 2)
 	if not buildNodeSizes[uSize] then buildNodeSizes[uSize] = buildNodeSize end
 	local node = astar.nearest_node(bx, bz, buildGraph, buildNodeSize, valid_node_func)
 	if node then
+		-- Spring.Echo("got on-the-fly build redirect")
 		return node.x, node.y, mRandom(1, 4)
 	end
+	-- Spring.Echo("no on-the-fly build redirect")
 end
 
 local function occupyReDirSpot(unitID, unitDefID)
@@ -439,8 +441,9 @@ function gadget:AllowCommand(unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdO
 			if #cmdParams > 2 then
 				local bx, bz = cmdParams[1], cmdParams[3]
 				local groundType, _ = spGetGroundInfo(bx, bz)
-				if sandType[groundType] then
+				if footprintOnSand(bx, bz, -cmdID, cmdParams[4]) then
 					local x, z, bface = getBuildRedirect(bx, bz, -cmdID)
+					bface = bface or cmdParams[4]
 					if x then
 						occupyThis = { unitID, unitTeam, uDefID }
 						spGiveOrderToUnit(unitID, cmdID, {x, spGetGroundHeight(x,z), z, bface}, cmdOpts)

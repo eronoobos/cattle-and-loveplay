@@ -15,6 +15,7 @@ end
 -- options that will be set by map options
 local wormSpeed = 1.0 -- how much the worm's vector is multiplied by to produce a position each game frame. slightly randomized for each worm (+/- 10%)
 local wormEatMex = false -- will worms eat metal extractors?
+local wormEatGeo = false -- will worms eat geothermal plants?
 local wormEatCommander = false -- will worms eat commanders?
 local wormAggression = 5 -- translates into movementPerWormAnger and unitsPerWormAnger
 
@@ -37,6 +38,7 @@ local baseWormDuration = 90 -- how long will a worm chase something to eat befor
 local wormChaseTimeMod = 2 -- how much to multiply the as-the-crow-flies estimated time of arrival at target. modified by wormAnger
 local distancePerValue = 2000 -- how value converts to distance, to decide between close vs valuable targets
 local mexValue = -200 -- negative value = inaccuracy of targetting
+local geoValue = -250 -- negative value = inaccuracy of targetting
 local hoverValue = -300 -- negative value = inaccuracy of targetting
 local commanderValue = -100 -- negative value = inaccuracy of targetting
 local attackDelay = 22 -- delay between worm attacks
@@ -145,6 +147,9 @@ local spSetUnitNoDraw = Spring.SetUnitNoDraw
 local spSetUnitNoMinimap = Spring.SetUnitNoMinimap
 local spSetUnitNoSelect = Spring.SetUnitNoSelect
 local spGetUnitSeparation = Spring.GetUnitSeparation
+local spGetTeamList = Spring.GetTeamList
+local spIsPosInLos = Spring.IsPosInLos
+local spSetTeamRulesParam = Spring.SetTeamRulesParam
 
 -- localizations that must be set in Initialize
 local spMoveCtrlEnable
@@ -320,6 +325,11 @@ local function getSandUnitValues()
 			-- spEcho(uDef.name, uDef.humanName, "is mex")
 			vals[uDefID] = mexValue
 			if not wormEatMex then
+				inedible[uDefID] = true
+			end
+		elseif uDef.needGeo then
+			vals[uDefID] = geoValue
+			if not wormEatGeo then
 				inedible[uDefID] = true
 			end
 		elseif uDef.moveDef and uDef.moveDef.family == "hover" then
@@ -624,10 +634,8 @@ local function wormTargetting()
 					if adist < 0 then fortyFive = -quarterPi end
 					local newa = AngleAdd(cura, fortyFive)
 					w.tx, w.tz = CirclePos(w.x, w.z, u.dist, AngleAdd(cura, fortyFive))
-					-- spEcho("adist above quarterpi", fortyFive, newa)
 				else
 					w.tx, w.tz = CirclePos(w.x, w.z, u.dist, testa)
-					-- spEcho("adist below quarterpi, using testa")
 				end
 				-- w.tx, w.tz = u.ux, u.uz
 			end
@@ -636,102 +644,58 @@ local function wormTargetting()
 	return num, mCeil(totalMovement)
 end
 
-local function drawCegLine(x1, y1, z1, x2, y2, z2, ceg, spacing)
-	spacing = spacing or 1
-	ceg = ceg or "WORMSIGN_LIGHTNING_SMALL"
-	local vx, vy, vz, dist = normalizeVector3d(x2-x1, y2-y1, z2-z1)
-	for i = 0, dist, spacing do
-		spSpawnCEG(ceg, x1+i*vx, y1+i*vy, z1+i*vz, 0, 1, 0, 2, 0)
-	end
-end
-
-local function signArcLightning(x1, z1, x2, z2, offsetMult, generationNum, branchProb, lightningCeg, flashCeg, minOffsetMultXZ, minOffsetMultY)
-	offsetMult = offsetMult or 0.4
-	generationNum = generationNum or 5
-	branchProb = branchProb or 0.2
-	lightningCeg = lightningCeg or "WORMSIGN_LIGHTNING_SMALL"
-	flashCeg = flashCeg or "WORMSIGN_FLASH_SMALL"
-	minOffsetMultXZ = minOffsetXZ or 0.05
-	minOffsetMultY = minOffsetY or 0.1
+local function signArcLightning(x1, z1, x2, z2)
+	local allyList = spGetAllyTeamList()
 	local y1, y2 = spGetGroundHeight(x1, z1), spGetGroundHeight(x2, z2)
-	local segmentList = { {init = {x=x1,y=y1,z=z1}, term = {x=x2,y=y2,z=z2}} }
-	for g = 1, generationNum do
-		local newSegmentList = {}
-		for s = #segmentList, 1, -1 do
-			local seg = tRemove(segmentList, s)
-			local midX = (seg.init.x + seg.term.x) / 2
-			local midY = (seg.init.y + seg.term.y) / 2
-			local midZ = (seg.init.z + seg.term.z) / 2
-			local vx, vz, dist = normalizeVector2d(seg.term.x-seg.init.x, seg.term.z-seg.init.z)
-			local pvx, pvz = perpendicularVector2d(vx, vz)
-			local offMax = dist * offsetMult
-			local offsetXZ = mRandom(dist*minOffsetMultXZ, dist*offsetMult)
-			midX, midZ = midX+(pvx*offsetXZ), midZ+(pvz*offsetXZ)
-			midY = mMax( spGetGroundHeight(midX,midZ), midY+mRandom(dist*minOffsetMultY,offMax) )
-			local mid = {x=midX, y=midY, z=midZ}
-			newSegmentList[#newSegmentList+1] = {init=seg.init, term=mid}
-			newSegmentList[#newSegmentList+1] = {init=mid, term=seg.term}
-			if mRandom() < branchProb then
-				local angle = mAtan2(vz, vx)
-				angle = AngleAdd(angle, (mRandom()*quarterPi)-eighthPi)
-				local bx, bz = CirclePos(seg.init.x, seg.init.z, dist*0.35, angle)
-				newSegmentList[#newSegmentList+1] = { init=seg.init, term={x=bx,y=seg.init.y,z=bz} }
+	for k, aID in pairs(allyList) do
+		if spIsPosInLos(x1, y1, z1, aID) or spIsPosInLos(x2, y2, z2, aID) then
+			local teamList = spGetTeamList(aID)
+			for t = 1, #teamList do
+				local teamID = teamList[t]
+				spSetTeamRulesParam(teamID, "wormLightningX1", x1)
+				spSetTeamRulesParam(teamID, "wormLightningZ1", z1)
+				spSetTeamRulesParam(teamID, "wormLightningX2", x2)
+				spSetTeamRulesParam(teamID, "wormLightningZ2", z2)
 			end
 		end
-		segmentList = newSegmentList
 	end
-	for i = 1, #segmentList do
-		local seg = segmentList[i]
-		drawCegLine(seg.init.x, seg.init.y, seg.init.z, seg.term.x, seg.term.y, seg.term.z, lightningCeg)
-	end
-	spSpawnCEG(flashCeg,x1,y1,z1,0,1,0,2,0)
-	spSpawnCEG(flashCeg,x2,y2,z2,0,1,0,2,0)
 end
 
-local function arcLightningOverPoint(x, z, arcLength, offsetMult, generationNum, branchProb, lightningCeg, flashCeg, minOffsetMultXZ, minOffsetMultY)
+local function arcLightningOverPoint(x, z, arcLength)
 	local angle1 = mRandom() * twicePi
-	local angle2 = AngleAdd(angle1, pi)
+	local angle2 = AngleAdd(angle1, pi + mRandom()*quarterPi - eighthPi)
 	local radius = arcLength / 2
-	local x1, z1 = CirclePos(x, z, radius, angle1)
-	local x2, z2 = CirclePos(x, z, radius, angle2)
-	signArcLightning(x1, z1, x2, z2, offsetMult, generationNum, branchProb, lightningCeg, flashCeg, minOffsetMultXZ, minOffsetMultY)
+	local offset = mRandom() * radius * 0.25
+	local x1, z1 = CirclePos(x, z, radius-offset, angle1)
+	local x2, z2 = CirclePos(x, z, radius+offset, angle2)
+	signArcLightning(x1, z1, x2, z2)
 end
 
 local function wormBigSign(w)
-	local minArc = mCeil(w.size.radius * 8)
-	local maxArc = mCeil(w.size.radius * 10)
-	local sx, sz = CirclePos(w.x, w.z, mRandom(minArc, maxArc))
-	signArcLightning( w.x, w.z, sx, sz, nil, 6, nil, "WORMSIGN_LIGHTNING", "WORMSIGN_FLASH" )
+	local minArc = mCeil(w.size.diameter * 2)
+	local maxArc = mCeil(w.size.diameter * 3)
+	arcLightningOverPoint( w.x, w.z, mRandom(minArc, maxArc) )
 	local snd = thunderSnds[mRandom(#thunderSnds)]
 	local y = spGetGroundHeight(w.x, w.z)
-	spPlaySoundFile(snd,0.75,w.x,y,w.z)
+	spPlaySoundFile(snd,1.5,w.x,y,w.z)
 end
 
 local function wormMediumSign(w)
 	if not w then return end
-	local angle = mRandom() * twicePi
-	local sx1, sz1 = CirclePos(w.x, w.z, w.size.radius*0.5, angle)
-	local sx2, sz2 = CirclePos(w.x, w.z, w.size.diameter, angle)
-	signArcLightning( sx1, sz1, sx2, sz2 )
+	local minArc, maxArc = mCeil(w.size.diameter * 1.2), mCeil(w.size.diameter * 1.4)
+	arcLightningOverPoint( w.x, w.z, mRandom(minArc, maxArc) )
 	local snd = lightningMediumSnds[mRandom(#lightningMediumSnds)]
-	spPlaySoundFile(snd,0.1,sx,sy,sz)
+	local y = spGetGroundHeight(w.x, w.z)
+	spPlaySoundFile(snd,1.25,w.x,y,w.z)
 end
 
-local function wormLittleSign(w, sx, sz)
-	if not w and not sx then return end
-	sx = sx or w.x
-	sz = sz or w.z
-	local minArc, maxArc
-	if w then
-		minArc = mCeil(w.size.radius)
-		maxArc = mCeil(w.size.diameter)
-	else
-		minArc = 24
-		maxArc = 96
-	end
-	arcLightningOverPoint( sx, sz, mRandom(minArc, maxArc) )
+local function wormLittleSign(w)
+	if not w then return end
+	local minArc, maxArc = mCeil(w.size.radius), mCeil(w.size.diameter)
+	arcLightningOverPoint( w.x, w.z, mRandom(minArc, maxArc) )
 	local snd = lightningLittleSnds[mRandom(#lightningLittleSnds)]
-	spPlaySoundFile(snd,0.05,sx,sy,sz)
+	local y = spGetGroundHeight(w.x, w.z)
+	spPlaySoundFile(snd,1.0,w.x,y,w.z)
 end
 
 local function wormMoveUnderUnit(w)
@@ -1129,6 +1093,7 @@ function gadget:Initialize()
 		movementPerWormAnger = 100000 / wormAggression
 		if mapOptions.sworm_worm_speed then wormSpeed = tonumber(mapOptions.sworm_worm_speed) end
 		if mapOptions.sworm_eat_mex == "1" then wormEatMex = true end
+		if mapOptions.sworm_eat_geo == "1" then wormEatGeo = true end
 		if mapOptions.sworm_eat_commander == "1" then wormEatCommander = true end
 		-- SendToUnsynced("passWormInit", evalFrequency, wormSpeed, 65) -- uncomment for showing worm positions with debug widget
 	end
@@ -1159,6 +1124,7 @@ function gadget:GameStart()
 	spEcho("sand worm aggression", wormAggression)
 	spEcho("sand worm base speed", wormSpeed)
 	spEcho("sand worms eat mex?", wormEatMex)
+	spEcho("sand worms eat geo?", wormEatGeo)
 	spEcho("sand worms eat commander?", wormEatCommander)
 end
 

@@ -8,7 +8,7 @@ local mapinfo = {
 	shortname   = "CattleAndLoveplay",
 	description = "Dune. Desert map. By default, non-metal extracting buildings sink into sand and worms will eat your units on the sand. Many thanks to knorke, Google_Frog, SirArtturi, PicassoCT, FabriceFABS, and 8611. Some sound effects from http://www.freesfx.co.uk",
 	author      = "eronoobos",
-	version     = "7",
+	version     = "8",
 	--mutator   = "deployment";
 	--mapfile   = "", --// location of smf/sm3 file (optional)
 	modtype     = 3, --// 1=primary, 0=hidden, 3=map
