@@ -47,3 +47,6 @@ Map for Spring RTS with sand worms.
 ![screenshot3](ReadmeImages/screen3.jpg)
 ![screenshot4](ReadmeImages/screen4.jpg)
 ![screenshot5](ReadmeImages/screen5.jpg)
+![screenshot6](ReadmeImages/screen6.jpg)
+![screenshot7](ReadmeImages/screen7.jpg)
+
