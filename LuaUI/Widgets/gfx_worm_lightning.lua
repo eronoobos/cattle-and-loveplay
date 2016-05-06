@@ -14,8 +14,7 @@ local timelineElementDuration = 0.075 -- in seconds
 local timelineMinSize = 3
 local timelineMaxSize = 12
 local connectProbability = 0.25
-local flashTex = "bitmaps/sworm_lightning_glow.png"
-local flashSizeMult = 6
+local lightRadiusMult = 15
 
 local strikes = {}
 
@@ -210,16 +209,6 @@ local function drawLightning(segments, radius, trunkOnly)
 	end
 end
 
-local function drawLightningFlash(x, y, z, size, color)
-	glPushMatrix()
-	glColor(color)
-	glTexture(flashTex)
-	glTranslate(x, y, z)
-	glBillboard()
-	glTexRect(-size, -size, size, size)
-	glPopMatrix()
-end
-
 local function getLightningSegments(x1, z1, x2, z2, offsetMult, generationNum, branchProb, minOffsetMultXZ, minOffsetMultY)
 	offsetMult = offsetMult or 0.4
 	generationNum = generationNum or 5
@@ -284,19 +273,24 @@ local function passWormLightning(x1, z1, x2, z2, offsetMult, generationNum, bran
 	local baseColor = { 0.5+(r*0.5), 0.0, 0.5+((1-r)*0.5), 1.0 }
 	local coreColor = { baseColor[1], 0.5, baseColor[3], 0.1 }
 	local glowColor = { baseColor[1], 0, baseColor[3], 0.01 }
-	local flashColor = { baseColor[1], baseColor[2], baseColor[3], 0.5}
+	local lightColor = { baseColor[1]*0.6, 0.2, baseColor[3]*0.6 }
 	local radius = mMax( mAbs(x2-x1), mAbs(y2-y1), mAbs(z2-z1) ) / 2
 	local x, y, z = (x1+x2) / 2, (y1+y2) / 2, (z1+z2) / 2
-	local flashSize = radius * flashSizeMult
 	local strike = {
 		-- baseColor = baseColor,
+		x1=x1, z1=z1,
+		x2=x2, z2=z2,
+		y1 = spGetGroundHeight(x1,z1) + 10,
+		y2 = spGetGroundHeight(x2,z2) + 10,
+		x=x, y=y2, z=z,
+		lightRadius = radius * lightRadiusMult,
 		trunkColor = glowColor,
 		coreColor = coreColor,
 		glowColor = glowColor,
+		lightColor = lightColor,
 		coreDisplayList = glCreateList(drawLightning, segments, thickness*0.67),
 		trunkDisplayList = glCreateList(drawLightning, segments, thickness*1.33, true),
 		glowDisplayList = glCreateList(drawLightning, segments, glowThickness),
-		flashDisplayList = glCreateList(drawLightningFlash, x, y, z, flashSize, flashColor),
 		timer = spGetTimer(),
 		timeline = getStrikeTimeline(),
 	}
@@ -328,16 +322,15 @@ function widget:Update(dt)
 				glDeleteList(s.coreDisplayList)
 				glDeleteList(s.trunkDisplayList)
 				glDeleteList(s.glowDisplayList)
-				glDeleteList(s.flashDisplayList)
 				tRemove(strikes, i)
 			else
 				local element = s.timeline[timeSlot]
 				-- Spring.Echo(age, timeSlot, element)
 				if element == 1.0 then
-					s.flash = true
+					Script.LuaGaia.wormLightningLight(s.x, s.y, s.z, s.lightRadius, s.lightColor)
+					Script.LuaGaia.wormLightningLight(s.x1, s.y1, s.z1, s.lightRadius, s.lightColor)
+					Script.LuaGaia.wormLightningLight(s.x2, s.y2, s.z2, s.lightRadius, s.lightColor)
 					s.flashed = true
-				else
-					s.flash = false
 				end
 				s.glowColor[4] = element * 0.1
 				s.coreColor[4] = element
@@ -371,13 +364,6 @@ function widget:DrawWorld()
 		end
 	end
 	-- glPopMatrix()
-	glDepthTest(false)
-	for i = 1, #strikes do
-		local s = strikes[i]
-		if s.flash then
-			glCallList(s.flashDisplayList)
-		end
-	end
 	glDepthTest(true)
 	glBlending("reset")
 	glColor(1, 1, 1, 0.5)
@@ -389,6 +375,5 @@ function widget:Shutdown()
 		glDeleteList(s.coreDisplayList)
 		glDeleteList(s.trunkDisplayList)
 		glDeleteList(s.glowDisplayList)
-		glDeleteList(s.flashDisplayList)
 	end
 end
